@@ -108,22 +108,26 @@ class OnlineConsumer(threading.Thread):
         self.training_data_in_queue = self.training_data_in_queue -1
         return training_data
     
-    def current_time(self):
+    # def current_time(self):
         
-        wait_for_response = True
-        retry = 0
-        while wait_for_response:
-            try:
-                ntp_client = ntplib.NTPClient()
-                response = ntp_client.request('ntp.cnam.fr')
-                wait_for_response = False
-            except (ntplib.NTPException) as e:
-                print('NTP client request error:', str(e))
-                retry = retry + 1
-                time.sleep(1)
-            if retry == 3:
-                wait_for_response = False
-        return response.tx_timestamp
+    #     wait_for_response = True
+    #     retry = 0
+    #     while wait_for_response:
+    #         try:
+    #             ntp_client = ntplib.NTPClient()
+    #             response = ntp_client.request('ntp.cnam.fr')
+    #             wait_for_response = False
+    #         except (ntplib.NTPException) as e:
+    #             print('NTP client request error:', str(e))
+    #             retry = retry + 1
+    #             time.sleep(1)
+    #         if retry == 3:
+    #             wait_for_response = False
+    #     return response.tx_timestamp
+
+    # Patched to avoid ntp dependency issues outside CNAM network
+    def current_time(self):
+        return time.time()
 
     def set_timed_training_data(self, training_data):
         

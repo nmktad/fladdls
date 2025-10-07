@@ -37,25 +37,29 @@ def publish_to_topic(producer_instance, topic_name, metrics_json):
         print(str(ex))
 
 
-def get_ntp_server_time():
+# def get_ntp_server_time():
     
-    wait_for_response = True
-    retry = 0
-    while wait_for_response:
+#     wait_for_response = True
+#     retry = 0
+#     while wait_for_response:
         
-        try:
-            ntp_client = ntplib.NTPClient()
-            response = ntp_client.request('ntp.cnam.fr')
-            wait_for_response = False
-        except (ntplib.NTPException) as e:
-            print('NTP client request error:', str(e))
-            retry = retry + 1
-            time.sleep(1)
+#         try:
+#             ntp_client = ntplib.NTPClient()
+#             response = ntp_client.request('ntp.cnam.fr')
+#             wait_for_response = False
+#         except (ntplib.NTPException) as e:
+#             print('NTP client request error:', str(e))
+#             retry = retry + 1
+#             time.sleep(1)
         
-        if retry == 3:
-            wait_for_response = False
+#         if retry == 3:
+#             wait_for_response = False
             
-    return response.tx_timestamp
+#     return response.tx_timestamp
+    
+# Patched to avoid ntp dependency issues outside CNAM network
+def get_ntp_server_time():
+    return time.time()
     
 def compute_regression_in_parallel_to_simulate_load():
     
@@ -179,8 +183,7 @@ def collect_publish(producer):
     print (number_of_samples)
     while start:
         try:
-            
-            if sample_counting % 10 == 0:
+            if sample_counting % 50 == 0:
                 print ("Sent samples: " + str(sample_counting))
             metrics_dict = collect_metrics(source_id)
 
@@ -192,6 +195,13 @@ def collect_publish(producer):
             metrics_json = json.dumps(metrics_dict)
             publish_to_topic(producer, topic_name, metrics_json)
             time.sleep(sampling_rate)
+            if sample_counting == 60:
+                sleep_time = 250
+                print ("Sent the first batch, waiting for eNDBF to start...")
+                while (sleep_time > 0):
+                    print (str(sleep_time) + " seconds remaining...")
+                    time.sleep(1)
+                    sleep_time = sleep_time - 1
             sample_counting = sample_counting + 1
           
                 

@@ -1,5 +1,6 @@
 #!/bin/bash
 
+sleep_time=20
 sleep 70
 echo "This is Datasource instance$1 from DPS$2"
 # sleep 15
@@ -30,7 +31,7 @@ echo ">>>> [$(date)] Sending Normal data for training..."
 # For now this delay is related to machine specs
 echo "Waiting for endbf to be ready..."
 echo "This might take some time..."
-for i in $(seq 250 -1 1); do
+for i in $(seq $sleep_time -1 1); do
     if (( i % 10 == 0 )); then
         echo "$i seconds remaining..."
     fi

@@ -82,24 +82,27 @@ def stabilise_deployment():
 			
 
 	
-def get_ntp_server_time():
+# def get_ntp_server_time():
 	
-	wait_for_response = True
-	retry = 0
-	while wait_for_response:
-		try:
-			ntp_client = ntplib.NTPClient()
-			response = ntp_client.request('ntp.cnam.fr')
-			wait_for_response = False
-		except (ntplib.NTPException) as e:
-			print('NTP client request error:', str(e))
-			retry = retry + 1
-			time.sleep(1)
-		if retry == 3:
-			wait_for_response = False
-	return response.tx_timestamp
+# 	wait_for_response = True
+# 	retry = 0
+# 	while wait_for_response:
+# 		try:
+# 			ntp_client = ntplib.NTPClient()
+# 			response = ntp_client.request('ntp.cnam.fr')
+# 			wait_for_response = False
+# 		except (ntplib.NTPException) as e:
+# 			print('NTP client request error:', str(e))
+# 			retry = retry + 1
+# 			time.sleep(1)
+# 		if retry == 3:
+# 			wait_for_response = False
+# 	return response.tx_timestamp
 			
-			
+   
+# Patched to avoid ntp dependency issues outside CNAM network
+def get_ntp_server_time():
+    return time.time()
 	
 	
 # Function to decode the message value
