@@ -117,6 +117,9 @@ class Client:
         self.producer_sleep_time_interval = 0.00
         # self.connect_to_data_pipeline = False
         self.data_pipeline_parameter = data_pipeline_parameter
+        
+        self.threshold_alpha = 0.3  # adjust between 0 (slow) and 1 (fast)
+        self.threshold = None
 
         print(f"connection {target}")
         # make_keras_picklable()  # WORKROUND
@@ -422,17 +425,21 @@ class Client:
         train_MSE, round_threshold = self.get_data_analysis(resource_name, k_model, x_train,
                                                             self.test_dataset[resource_name])
 
-        # Update incremental MSE
         self.incremental_MSE = np.concatenate((self.incremental_MSE, train_MSE))
 
-        # --- Faster-responding threshold using Exponential Moving Average ---
-        alpha = getattr(self, "threshold_smoothing", 0.3)  # smoothing factor (0–1)
-        if not hasattr(self, "previous_threshold"):
-            self.previous_threshold = np.mean(train_MSE)
 
-        # Blend recent and previous thresholds
-        threshold = alpha * np.mean(train_MSE) + (1 - alpha) * self.previous_threshold
-        self.previous_threshold = threshold
+        # Added Later
+        # threshold = np.quantile(self.incremental_MSE, self.quantile)
+        # threshold = np.mean(self.incremental_MSE)
+        
+        # Exponential moving average for threshold
+        if self.threshold is None:
+            self.threshold = np.mean(train_MSE)
+        else:
+            self.threshold = (
+                self.threshold_alpha * np.mean(train_MSE)
+                + (1 - self.threshold_alpha) * self.threshold
+            
 
         print("=" * 80)
 
@@ -783,22 +790,27 @@ from tensorflow.keras.callbacks import EarlyStopping
 
 
     
-def current_time():
+# def current_time():
         
-    wait_for_response = True
-    retry = 0
-    while wait_for_response:
-        try:
-            ntp_client = ntplib.NTPClient()
-            response = ntp_client.request('ntp.cnam.fr')
-            wait_for_response = False
-        except (ntplib.NTPException) as e:
-            print('NTP client request error:', str(e))
-            retry = retry + 1
-            time.sleep(1)
-        if retry == 3:
-            wait_for_response = False
-    return response.tx_timestamp
+#     wait_for_response = True
+#     retry = 0
+#     while wait_for_response:
+#         try:
+#             ntp_client = ntplib.NTPClient()
+#             response = ntp_client.request('ntp.cnam.fr')
+#             wait_for_response = False
+#         except (ntplib.NTPException) as e:
+#             print('NTP client request error:', str(e))
+#             retry = retry + 1
+#             time.sleep(1)
+#         if retry == 3:
+#             wait_for_response = False
+#     return response.tx_timestamp
+
+# Patched to avoid ntp dependency issues outside CNAM network
+def current_time():
+    return time.time()
+
     
 def keras_lstm_training(X, y, epochs, model, batch_size=64, verbose=1):
     # fit model
