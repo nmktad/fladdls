@@ -199,7 +199,8 @@ def collect_publish(producer):
                 sleep_time = 250
                 print ("Sent the first batch, waiting for eNDBF to start...")
                 while (sleep_time > 0):
-                    print (str(sleep_time) + " seconds remaining...")
+                    if sleep_time % 30 == 0:
+                        print (str(sleep_time) + " seconds remaining...")
                     time.sleep(1)
                     sleep_time = sleep_time - 1
             sample_counting = sample_counting + 1

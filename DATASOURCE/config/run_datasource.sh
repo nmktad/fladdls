@@ -28,48 +28,27 @@ cd /data_sources/
 
 echo ">>>> [$(date)] Sending Normal data for training..."
 
-# For now this delay is related to machine specs
-echo "Waiting for endbf to be ready..."
-echo "This might take some time..."
-for i in $(seq $sleep_time -1 1); do
-    if (( i % 10 == 0 )); then
-        echo "$i seconds remaining..."
-    fi
-    sleep 1
-done
+
 python3 collect_produce_normal.py
 
-if [ "$DPS_NUMBER" -eq 2 ]; then
+
+echo "***********************************************"
+echo ">>>> [$(date)] Starting alternating random/fixed  *****"
+echo "***********************************************"
+sleep 10
+
+for i in {1..3}; do
+
     echo "***********************************************"
-    echo ">>>> [$(date)] Starting alternating random/fixed  *****"
+    echo ">>>> [$(date)] Starting round ${i}..."
     echo "***********************************************"
-    sleep 10
-
-    for i in {1..3}; do
-
-        echo "***********************************************"
-        echo ">>>> [$(date)] Starting round ${i}..."
-        echo "***********************************************"
 
 
-        echo "***********************************************"
-        echo ">>>> [$(date)] Sending ABNORMAL data for a Maximum of 3 minutes..."
-        echo "***********************************************"
-        timeout 180 python3 collect_produce_anomaly.py
-        
-        echo "[CLEANUP] Killing all remaining Python processes..."
-        pkill -f python
-    done
-else
-    echo ">>>> [$(date)] Continue ending Normal data ..."
-
-    for i in {1..3}; do
-
-        echo "***********************************************"
-        echo ">>>> [$(date)] Starting round ${i}..."
-        echo "***********************************************"
-        python3 collect_produce_normal.py
-        
-    done
+    echo "***********************************************"
+    echo ">>>> [$(date)] Sending ABNORMAL data for a Maximum of 3 minutes..."
+    echo "***********************************************"
+    timeout 180 python3 collect_produce_anomaly.py
     
-fi
+    echo "[CLEANUP] Killing all remaining Python processes..."
+    pkill -f python
+done
