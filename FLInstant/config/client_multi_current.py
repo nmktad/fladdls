@@ -426,7 +426,7 @@ class Client:
         self.incremental_MSE = np.concatenate((self.incremental_MSE, train_MSE))
 
         # --- Faster-responding threshold using Exponential Moving Average ---
-        alpha = getattr(self, "threshold_smoothing", 0.25)  # smoothing factor (0–1)
+        alpha = getattr(self, "threshold_smoothing", 0.2)  # smoothing factor (0–1)
         if not hasattr(self, "previous_threshold"):
             self.previous_threshold = np.mean(train_MSE)
 
