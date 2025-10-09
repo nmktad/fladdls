@@ -9,7 +9,7 @@ NETWORKS=("server_client_network" "dps_1_network" "dps_2_network")
 # Function to show usage help
 usage() {
   echo "Usage: $0 <docker-compose-file.yml>"
-  echo "Example: $0 docker-compose-task1.yml"
+  echo "Example: $0 docker-compose-x86.yml"
   exit 1
 }
 
