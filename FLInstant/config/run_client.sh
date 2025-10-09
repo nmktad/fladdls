@@ -14,6 +14,9 @@ echo "Updating server config file ..."
 envsubst < /app/confs/config.json.template > /in_network_federaed_learning_for_anomaly_detection/FLConfig/config.json
 envsubst < /app/confs/client_driver_current.py.template > /in_network_federaed_learning_for_anomaly_detection/FLClients/client_driver_current.py
 
+cp /app/confs/ProducerConsumer.py /in_network_federaed_learning_for_anomaly_detection/FLClients/
+cp /app/confs/client_multi_current.py /in_network_federaed_learning_for_anomaly_detection/FLClients/
+
 echo "starting Client-$1 container ..."
 echo "Going to connect to eNDBF: $KAFKA_IP, on topic: preprocessed_cpu_topic_t_$1"
 cd /in_network_federaed_learning_for_anomaly_detection/FLClients
