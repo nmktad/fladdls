@@ -1,12 +1,58 @@
-# FLADDPS (Federated Learning Anomaly Detection Data Pipline System)
+# FLADDPS (Federated Learning Anomaly Detection Data Pipline System) Demo
 
 
-## Task 1:
-### 1. Getting started
+This demo showcases a real-time online federated learning with anomoly detection using data pipline system. You can run this demo on your own computer and test it! 
 
+## How to run this demo:
+### A. Using the provided VMs (Ready to run):
+1. Download a hypervisor:
+
+    A. If you have x86 machines (Intel/AMD CPU) install VirtualBox [Download VirtualBox](https://www.virtualbox.org/wiki/Downloads).
+
+    B. If you have MacBooks with Apple silicon (M1-M4), install UTM [Download UTM](https://mac.getutm.app/)
+
+    Make sure you run and test the hypervisors for the first time.
+
+2. Download and run the provided ready to run VM:
+
+    A. [VirtualBox VM](https://box.roc.cnam.fr/index.php/s/6rjHxcLgyNCTGyc) for x86 devices. 
+        
+    Download the `FLADDPS-Demo.ova` file.
+
+    Open VirtualBox and import it: File -> Import Appliance... (Ctrl + I), it will take some time. The VM needs at least 6GB (assign 8GB if its possible) of ram to run. You can change these settings in VirtualBox settings.
+
+    Start the VM (Username and Password: flad/flad).
+
+    B. [UTM VM]() for arm devices.
+    Download the Zip file and extract it (you should see a UTM file), double click on it and should open by UTM, The VM needs at least 6GB (assign 8GB if its possible) of ram to run. You can change these settings on UTM settings.
+
+    Start the VM (Username and Password: debian/debian).
+
+3. Run the demo:
+    A. Open the terminal:
+    ```
+    cd fladdps_container
+
+    # For x86 devices: 
+    ./start_datapipline.sh docker-compose-x86.yaml
+    # For arm devices: 
+    ./start_datapipline.sh docker-compose-arm.yaml
+    ```
+    ![Start the DPS Demo](assets/start_demo.jpg)
+    B. Wait until the first batch of data sent, open another teminal (tab/window) and run:
+    ![First Batch](assets/first_batch.jpg)
+    ```
+    python3 live_plots.py
+    ```
+    ![Start live plots](assets/start%20live_plots.jpg)
+    to see the real-time plot.
+---
+### B. Using docker:
+#### Run the demo:
+##### This will work on Mac and Linux, if you have windows you can run the commands inside `start_datapipline.sh` manually.
 1. Clone the project:
     ```
-    git clone https://gitlab.roc.cnam.fr/goyban/usees3_fladdps.git
+    git clone https://gitlab.roc.cnam.fr/goyban/fladdps_container.git
     ```
     Make sure docker and docker compose are installed.
 
@@ -15,47 +61,49 @@
     docker run hello-world # For docker
     docker compose version # For docker compose
     ```
-2. Run the first task:
-    ```
-    ./start_datapipeline.sh docker-compose-task1.yaml
+2. Run the demo:
+   ```
+    cd fladdps_container
+
+    # For x86 devices: 
+    ./start_datapipline.sh docker-compose-x86.yaml
+    # For arm devices: 
+    ./start_datapipline.sh docker-compose-arm.yaml
     ```
     **Note**: You can stop it any time by pressing `ctrl + C` or force stop it by pressing `ctrl + C` twice.
     It will take some time to build the containers for the first time.
 3. Check the output in "Output" folder
 4. If you want to follow the logs for a spedific container:
     ```
-    docker compose -f docker-compose-task1.yaml logs -f {container name}
+    docker compose -f docker-compose-<x86/arm>.yaml logs -f {container name}
     ```
     Checking the logs for only flclient-1:
     ```
-    docker compose -f docker-compose-task1.yaml logs -f flclient-1
+    docker compose -f docker-compose-<x86/arm>.yaml logs -f flclient-1
     ```
     Checking the logs for multiple contianers:
     ```
-    docker compose -f docker-compose-task1.yaml logs -f flclient-1 flclient-2 flserver ... # or add more
+    docker compose -f docker-compose-<x86/arm>.yaml logs -f flclient-1 flclient-2 flserver ... # or add more
     ```
 5. Check the live plot, run `live_plots.py`:
     ```
     python3 live_plots.py
     ```
-
-### 2. Explore the code
-### The structure of the project:
+---
+#### Explore the code
+##### The structure of the project:
     ├── DATASOURCE                  # Files and configs related to datasource containers
     │   ├── config                  # Configs and start scripts
-    │   └── Dockerfile 
-    ├── docker-compose-task1.yaml   # Docker compose file for the first task
-    ├── docker-compose.yaml         # Docker compose file for the main
+    ├── docker-compose-x86.yaml     # Docker compose file for x86
+    ├── docker-compose-arm.yaml     # Docker compose file for arm
     ├── FLInstant                   # Files and configs related to Server, Client and Inference containers
     │   ├── config                  # Configs and start scripts
-    │   ├── Dockerfile
     │   └── in_network_federaed_learning_for_anomaly_detection  # The source code
     ├── live_plots.py               # To plot the inference results
     ├── NDBF                        # Files and configs related to data broker containrs
     │   └── config                  # Configs and start scripts
     ├── NDPPF                       # Files and configs related to post processing containr
     │   ├── config                  # Configs and start scripts
-    │   ├── Dockerfile
     │   └── network_data_preprocessing_function                 # The source code
     ├── README.md
     ├── .env                        # Main .env file, contains variables, IP addresses and global configs like Number of rounds, epochs, ...
@@ -65,40 +113,13 @@
 
 ### In order to know how to modify the data pipeline, you can change some part of the code and see its effect.
 
-#### 1. Make the system run for a longer time:
+#### 1. Make the easy changes
 
-- The code (from task 1) runs only for 3 rounds, 2 epochs, increse it to 10 rounds, 3 epochs to have sufficent rounds for training.
-- Edit the `.env` file, set `FED_CONFIG_R=10` and `FED_CONFIG_E=3` and the save it.
+- The demo runs for 20 rounds, 3 epochs, you can change that.
+- You can edit the `.env` file, set `FED_CONFIG_R` and `FED_CONFIG_E` in order to train it for more or less rounds/epochs or other configurations related to network, topology and runtime.
 
-#### 2. Increase the number of samples produced by datasources.
-- Run it again:
-    ```
-    ./start_datapipeline.sh docker-compose-task1.yaml
-    ```
-- You will notice that the DATASOURCE containers will stop generating data after some time, so the training process can't be finished.
-- Go to DATASOURCE folder and find the main python codes for generating data: `collect_produce_normal_task1.py`.
-- You should be able to easily find section of the code that is responsible for the `number of samples` generated by DATASOURCE containers.
-- Change it so that generating data stops AFTER the training is done by chacking the output of flclient containers:
+#### 2. Change the code:
+- Each container has a config directory. You can check that folder and the .sh script to see how each container starts.
+- The source code is also available and possible to change.
 
-    ```
-    docker logs -f flclient-1 #(or flclient-2)
-    ```
-- Check the "Output" directory for some results.
-- Check the plot as well:
-    ```
-    python3 live_plots.py
-    ```
-
-### 3. Run the main task, with some anomoly!
-- Edit the .env file, set `FED_CONFIG_R=30` and `FED_CONFIG_E=3` and the save it.
-- Run the main task:
-    ```
-    ./start_datapipeline.sh docker-compose.yaml
-    ```
-- Check the `Output` folder.
-- Run live plots and you should see some anomolies after the training is finished and datasources start to stress.
-    ```
-    python3 live_plots.py
-    ```
-
-### Now you should know how the Datapipeline works and how to change some parts of the code. You can continue with task 2 and 3.
+### Now you should know how the Datapipeline works and how to change some parts of the code.
