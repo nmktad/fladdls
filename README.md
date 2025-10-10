@@ -89,6 +89,10 @@ This demo showcases a real-time online federated learning with anomoly detection
     ```
     python3 live_plots.py
     ```
+    **In order for `live_plots.py` to work properly you need to install `pandas` and `matplotlib` isntalled.**
+
+    **If you already have python venv on our machine, you should be able to `source rtplot/bin/activate`.**
+
 ---
 #### Explore the code
 ##### The structure of the project:
