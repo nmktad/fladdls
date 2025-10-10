@@ -23,8 +23,15 @@ This demo showcases a real-time online federated learning with anomoly detection
 
     Start the VM (Username and Password: flad/flad).
 
-    B. [UTM VM]() for arm devices.
-    Download the Zip file and extract it (you should see a UTM file), double click on it and should open by UTM, The VM needs at least 6GB (assign 8GB if its possible) of ram to run. You can change these settings on UTM settings.
+    B. The two files: [UTM VM main](https://box.roc.cnam.fr/index.php/s/eDLGZX4A9f9nrfe) `Flad_Demo_archive.zip` and [UTM VM part1](https://box.roc.cnam.fr/index.php/s/LcsExKfTaprqrgn) `Flad_Demo_archive.z01` are for arm MacBooks.
+    Download the two Zip files, and put them in the same folder.
+    - You can use [The Unarchiver](https://theunarchiver.com/)  and extract the `.zip` file using GUI (It will combine them automatically).
+    - Or use terminal:
+    ```
+    zip -s 0 Flad_Demo_archive.zip --out Flad_Demo.zip
+    unzip Flad_Demo.zip
+    ```
+    Now you should see a `.utm` file, double click on it, UTM should open it, The VM needs at least 6GB (assign 8GB if its possible) of ram to run. You can change these settings on UTM settings.
 
     Start the VM (Username and Password: debian/debian).
 
