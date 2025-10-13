@@ -2,6 +2,11 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import time
+from dotenv import dotenv_values
+
+env = dotenv_values(".env")
+max_rounds = int(env.get("FED_CONFIG_R", 20))  # read number of rounds
+print(f"Max rounds set to: {max_rounds}")
 
 # Configuration
 clients = {
@@ -38,7 +43,7 @@ print("Both files detected. Starting plot...")
 plt.ion()
 fig, ax = plt.subplots(figsize=(14, 6))
 ax.set_title("Live Updating MSE vs Threshold")
-ax.set_xlabel("Index")
+ax.set_xlabel("Epochs")
 ax.set_ylabel("MSE")
 ax.grid(True)
 
@@ -54,12 +59,16 @@ for name, cfg in clients.items():
         "last_row_read": 0,
         "index": 0,
         "last_mtime": 0,
+        "last_model": None,
         "line_mse": ax.plot([], [], label=f"{name} MSE", color=cfg["color"])[0],
         "line_thresh": ax.plot([], [], label=f"{name} Threshold", color=cfg["color"], linestyle="--")[0],
         "scatter": ax.scatter([], [], color=cfg["anomaly_color"], marker='o', label=f"{name} Anomaly")
     }
 
 ax.legend()
+
+
+training_finished_line_drawn = False
 
 while True:
     y_max = 0
@@ -83,7 +92,8 @@ while True:
                 "anomaly_x": [],
                 "anomaly_y": [],
                 "last_row_read": 0,
-                "index": 0
+                "index": 0,
+                "last_model": None
             })
 
             # Clear plot
@@ -100,15 +110,33 @@ while True:
 
         if not new_data.empty:
             for _, row in new_data.iterrows():
+                current_model = int(row["MODEL VERSION"])
+
                 data["x"].append(data["index"])
                 data["mse"].append(row["DETECTED MSE"])
                 data["thresh"].append(row["MSE THRESHOLD"])
+
                 if row["IS ANOMALY"]:
                     data["anomaly_x"].append(data["index"])
                     data["anomaly_y"].append(row["DETECTED MSE"])
+
+                # Add vertical lines for rounds
+                if data["last_model"] is not None and current_model != data["last_model"]:
+                    if current_model <= max_rounds:
+                        ax.axvline(data["index"], color="gray", linestyle=":", linewidth=0.8)
+                        ax.text(data["index"], ax.get_ylim()[1] * 0.9, f"R{current_model}",
+                                rotation=90, fontsize=8, color="gray")
+                    elif not training_finished_line_drawn and current_model > max_rounds:
+                        # Draw "Training Finished" line only once
+                        ax.axvline(data["index"], color="red", linestyle="--", linewidth=1.2)
+                        ax.text(data["index"], ax.get_ylim()[1] * 0.9, "Training Finished",
+                                rotation=90, fontsize=9, color="red", fontweight="bold")
+                        training_finished_line_drawn = True
+
+                data["last_model"] = current_model
                 data["index"] += 1
 
-            # Update plots
+            # Update line data
             data["line_mse"].set_data(data["x"], data["mse"])
             data["line_thresh"].set_data(data["x"], data["thresh"])
             data["scatter"].remove()

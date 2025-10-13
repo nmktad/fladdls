@@ -24,7 +24,7 @@ This demo showcases a real-time online federated learning with anomoly detection
     Start the VM (Username and Password: flad/flad).
 
     B. The two files: [UTM VM main](https://box.roc.cnam.fr/index.php/s/eDLGZX4A9f9nrfe) `Flad_Demo_archive.zip` and [UTM VM part1](https://box.roc.cnam.fr/index.php/s/LcsExKfTaprqrgn) `Flad_Demo_archive.z01` are for arm MacBooks.
-    Download the two Zip files, and put them in the same folder.
+    Download the two Zip files and put them in the same folder.
     - You can use [The Unarchiver](https://theunarchiver.com/)  and extract the `.zip` file using GUI (It will combine them automatically).
     - Or use terminal:
     ```
