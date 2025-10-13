@@ -122,15 +122,15 @@ while True:
 
                 # Add vertical lines for rounds
                 if data["last_model"] is not None and current_model != data["last_model"]:
-                    if current_model <= max_rounds:
-                        ax.axvline(data["index"], color="gray", linestyle=":", linewidth=0.8)
-                        ax.text(data["index"], ax.get_ylim()[1] * 0.9, f"R{current_model}",
-                                rotation=90, fontsize=8, color="gray")
-                    elif not training_finished_line_drawn and current_model > max_rounds:
+                    if current_model < max_rounds:
+                        ax.axvline(data["index"], color="yellow", linestyle=":", linewidth=0.8)
+                        ax.text(data["index"], 0.95, f"Round {current_model}",
+                                rotation=90, fontsize=8, color="gray", fontweight="bold", va='top', ha='left', transform=ax.get_xaxis_transform())
+                    elif not training_finished_line_drawn and current_model == max_rounds:
                         # Draw "Training Finished" line only once
                         ax.axvline(data["index"], color="red", linestyle="--", linewidth=1.2)
-                        ax.text(data["index"], ax.get_ylim()[1] * 0.9, "Training Finished",
-                                rotation=90, fontsize=9, color="red", fontweight="bold")
+                        ax.text(data["index"] + 1, 0.95, "Training Finished",
+                                rotation=90, fontsize=9, color="red", fontweight="bold", va='top', ha='left', transform=ax.get_xaxis_transform())
                         training_finished_line_drawn = True
 
                 data["last_model"] = current_model

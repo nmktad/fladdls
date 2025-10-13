@@ -201,6 +201,9 @@ def collect_publish(producer):
                 while (sleep_time > 0):
                     if sleep_time % 30 == 0:
                         print (str(sleep_time) + " seconds remaining...")
+                        print ("[Warning] Don't use this VM/computer during the training!")
+                        print ("[Warning] Model is going to train on real live metrics soon ...")
+                        print ("[Warning] Do not cause anomalies!")
                     time.sleep(1)
                     sleep_time = sleep_time - 1
             sample_counting = sample_counting + 1

@@ -36,9 +36,13 @@ This demo showcases a real-time online federated learning with anomoly detection
     Start the VM (Username and Password: debian/debian).
 
 3. Run the demo:
+
     A. Open the terminal:
     ```
     cd fladdps_container
+
+    # [Optional] Get the latest version:
+    git pull
 
     # For x86 devices: 
     ./start_datapipline.sh docker-compose-x86.yaml
@@ -78,7 +82,10 @@ This demo showcases a real-time online federated learning with anomoly detection
     ./start_datapipline.sh docker-compose-arm.yaml
     ```
     **Note**: You can stop it any time by pressing `ctrl + C` or force stop it by pressing `ctrl + C` twice.
-    It will take some time to build the containers for the first time.
+
+    **Note: The model will be trained on your machine's CPU metrics on real-time!** So make sure you don't use it during the training.
+
+    **Note** It will take some time to pull the containers for the first time.
 3. Check the output in "Output" folder
 4. If you want to follow the logs for a spedific container:
     ```
@@ -133,4 +140,17 @@ This demo showcases a real-time online federated learning with anomoly detection
 - Each container has a config directory. You can check that folder and the .sh script to see how each container starts.
 - The source code is also available and possible to change.
 
+#### 3. Run a better version:
+This demo is designed to train and finish fast, you can run a better and longer version:
+- Open `FLInstant/config/run_client.sh`,  and comment this line:
+    ```
+    cp /app/confs/client_multi_current.py /in_network_federaed_learning_for_anomaly_detection/FLClients/
+    ```
+- Open `.env` and increase the `FED_CONFIG_R` to at least 30 rounds.
+- Now run the demo again, it will take more time to train but would be more accurate.
+- You can compare the difference by comparing the plot.
+- To compare the codes you can run:
+    ```
+    diff FLInstant/config/client_multi_current.py FLInstant/in_network_federaed_learning_for_anomaly_detection/FLClients/client_multi_current.py
+    ```
 ### Now you should know how the Datapipeline works and how to change some parts of the code.
