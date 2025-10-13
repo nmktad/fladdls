@@ -1,7 +1,7 @@
 # FLADDPS (Federated Learning Anomaly Detection Data Pipline System) Demo
 
 This demo showcases a **real-time online federated learning system** with **anomaly detection** built on top of a data pipeline architecture.  
-You can run this demo on your own computer and experiment with it!
+You can [run this demo](#how-to-run-this-demo) on your own computer and experiment with it!
 
 ---
 
@@ -53,6 +53,8 @@ This allows you to **monitor model learning progress** in real time.
 
 ## How to run this demo:
 ### A. Using the provided VMs (Ready to run):
+This is the recommended way since its ready to run and metrics (CPU, RAM, ...) are isolated in the VM.
+
 1. Download a hypervisor:
 
     A. If you have x86 machines (Intel/AMD CPU) install VirtualBox [Download VirtualBox](https://www.virtualbox.org/wiki/Downloads).
@@ -108,7 +110,10 @@ This allows you to **monitor model learning progress** in real time.
 ---
 ### B. Using docker:
 #### Run the demo:
-##### This will work on Mac and Linux, if you have windows you can run the commands inside `start_datapipline.sh` manually.
+**It's possible to run the demo on your computer using docker (no need for a VM), however, this will collect your machine's real metrics. In this case, please don't use your computer during the training since it might cause some unwanted anomalies.**
+
+**This will work on Mac and Linux, if you have windows you can run the commands inside `start_datapipline.sh` manually.**
+
 1. Clone the project:
     ```
     git clone https://gitlab.roc.cnam.fr/goyban/fladdps_container.git
