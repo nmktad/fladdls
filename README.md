@@ -1,7 +1,55 @@
 # FLADDPS (Federated Learning Anomaly Detection Data Pipline System) Demo
 
+This demo showcases a **real-time online federated learning system** with **anomaly detection** built on top of a data pipeline architecture.  
+You can run this demo on your own computer and experiment with it!
 
-This demo showcases a real-time online federated learning with anomoly detection using data pipline system. You can run this demo on your own computer and test it! 
+---
+
+## Overview
+
+The system simulates a small-scale federated learning setup with multiple data sources, preprocessing, training, and inference components — all running as **containers**.
+
+Each block in the topology (see image below) represents a container.
+
+![Data Pipline System Topology](assets/dps_topology.png)
+
+
+### System Components
+
+#### Data Sources
+There are **4 data sources**, each representing a **dummy 5G gNodeB** node.  
+These containers are our source to generate **CPU metrics** that are:
+- Collected and published to the **specific topic** (cpu_metrics_dps_1).
+- Publish to their corresponding **iNDBF** containers.
+
+#### Data Broker
+The **data broker** aggregates metrics from all data sources that match the subscribed topic and forwards them to the **preprocessing unit** (`NDPPF`).
+
+#### Preprocessing & Distribution
+The **NDPPF** processes and distributes metrics to **client containers** (`FLClient`), where local model training takes place.
+
+
+### Federated Training Workflow
+
+There are two Data Pipleline System (DPS) in each one of them:
+
+1. **Clients** receive data streams from the preprocessing unit.  
+2. Each client **trains locally** on its own data.
+3. After each epoch, the clients send their **model updates** to the **Federated Learning Server (FLServer)**.
+4. The **FLServer** aggregates the received models.
+5. The **aggregated model** is then sent back to all clients and inference units.
+6. This process continues iteratively until training finishes by reaching the required rounds.
+
+
+### Anomaly Generation
+
+Once training is complete:
+- The data sources begin to **generate anomalies** by **randomly altering their CPU and RAM usage**.
+- A copy of the data is continuously sent to the **inference component** even during training.
+
+This allows you to **monitor model learning progress** in real time.
+
+---
 
 ## How to run this demo:
 ### A. Using the provided VMs (Ready to run):
@@ -41,7 +89,7 @@ This demo showcases a real-time online federated learning with anomoly detection
     ```
     cd fladdps_container
 
-    # [Optional] Get the latest version:
+    # [Recommended] Get the latest version:
     git pull
 
     # For x86 devices: 
@@ -85,7 +133,7 @@ This demo showcases a real-time online federated learning with anomoly detection
 
     **Note: The model will be trained on your machine's CPU metrics on real-time!** So make sure you don't use it during the training.
 
-    **Note** It will take some time to pull the containers for the first time.
+    **Note:** It will take some time to pull the containers for the first time.
 3. Check the output in "Output" folder
 4. If you want to follow the logs for a spedific container:
     ```
