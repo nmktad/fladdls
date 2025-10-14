@@ -1,4 +1,4 @@
-# FLADDPS (Federated Learning Anomaly Detection Data Pipline System) Demo
+# FLADDPS (Federated Learning Anomaly Detection Data Pipeline System) Demo
 
 This demo showcases a **real-time online federated learning system** with **anomaly detection** built on top of a data pipeline architecture.  
 You can [run this demo](#how-to-run-this-demo) on your own computer and experiment with it!
@@ -11,7 +11,7 @@ The system simulates a small-scale federated learning setup with multiple data s
 
 Each block in the topology (see image below) represents a container.
 
-![Data Pipline System Topology](assets/dps_topology.png)
+![Data Pipeline System Topology](assets/dps_topology.png)
 
 
 ### System Components
@@ -31,12 +31,12 @@ The **NDPPF** processes and distributes metrics to **client containers** (`FLCli
 
 ### Federated Training Workflow
 
-There are two Data Pipleline System (DPS) in each one of them:
+There are two Data Pipleline System (DPS) and in each DPS we have:
 
 1. **Clients** receive data streams from the preprocessing unit.  
 2. Each client **trains locally** on its own data.
 3. After each epoch, the clients send their **model updates** to the **Federated Learning Server (FLServer)**.
-4. The **FLServer** aggregates the received models.
+4. The **FLServer** (the same for both DPS) aggregates the received models.
 5. The **aggregated model** is then sent back to all clients and inference units.
 6. This process continues iteratively until training finishes by reaching the required rounds.
 
@@ -65,16 +65,17 @@ This is the recommended way since its ready to run and metrics (CPU, RAM, ...) a
 
 2. Download and run the provided ready to run VM:
 
-    A. [VirtualBox VM](https://box.roc.cnam.fr/index.php/s/6rjHxcLgyNCTGyc) for x86 devices. 
+    A. [Download VirtualBox VM](https://box.roc.cnam.fr/index.php/s/6rjHxcLgyNCTGyc) for x86 devices. 
         
     Download the `FLADDPS-Demo.ova` file.
 
-    Open VirtualBox and import it: File -> Import Appliance... (Ctrl + I), it will take some time. The VM needs at least 6GB (assign 8GB if its possible) of ram to run. You can change these settings in VirtualBox settings.
+    Open VirtualBox and import it: File -> Import Appliance... (Ctrl + I). The import will take some time. The VM needs at least 6GB (assign 8GB if possible) of ram to run. You can change these settings in VirtualBox settings.
 
-    Start the VM (Username and Password: flad/flad).
+    Start the VM **(Username and Password: flad/flad)**.
 
-    B. The two files: [UTM VM main](https://box.roc.cnam.fr/index.php/s/eDLGZX4A9f9nrfe) `Flad_Demo_archive.zip` and [UTM VM part1](https://box.roc.cnam.fr/index.php/s/LcsExKfTaprqrgn) `Flad_Demo_archive.z01` are for arm MacBooks.
-    Download the two Zip files and put them in the same folder.
+    B. The two files: [Download UTM VM main](https://box.roc.cnam.fr/index.php/s/eDLGZX4A9f9nrfe) `Flad_Demo_archive.zip` and [Download UTM VM part1](https://box.roc.cnam.fr/index.php/s/LcsExKfTaprqrgn) `Flad_Demo_archive.z01` are for arm MacBooks.
+
+    Download the two Zip files and put them in the same folder:
     - You can use [The Unarchiver](https://theunarchiver.com/)  and extract the `.zip` file using GUI (It will combine them automatically).
     - Or use terminal:
     ```
@@ -83,7 +84,9 @@ This is the recommended way since its ready to run and metrics (CPU, RAM, ...) a
     ```
     Now you should see a `.utm` file, double click on it, UTM should open it, The VM needs at least 6GB (assign 8GB if its possible) of ram to run. You can change these settings on UTM settings.
 
-    Start the VM (Username and Password: debian/debian).
+    **Note:** MacBooks tend to have lower RAM, it is recommended to close all other applications while running the VM.
+
+    Start the VM **(Username and Password: debian/debian)**.
 
 3. Run the demo:
 
@@ -95,24 +98,32 @@ This is the recommended way since its ready to run and metrics (CPU, RAM, ...) a
     git pull
 
     # For x86 devices: 
-    ./start_datapipline.sh docker-compose-x86.yaml
+    ./start_datapipeline.sh docker-compose-x86.yaml
     # For arm devices: 
-    ./start_datapipline.sh docker-compose-arm.yaml
+    ./start_datapipeline.sh docker-compose-arm.yaml
     ```
     ![Start the DPS Demo](assets/start_demo.jpg)
-    B. Wait until the first batch of data sent, open another teminal (tab/window) and run:
+
+    B. Wait until the first batch of metrics:
+    
     ![First Batch](assets/first_batch.jpg)
+
+    Now you can see the live plot, open another teminal (tab/window) and run:
+
     ```
     python3 live_plots.py
     ```
     ![Start live plots](assets/start%20live_plots.jpg)
-    to see the real-time plot.
+
+    That's it!
+
+    Watch the live demo and wait until the training is done, shortly after the datasoruces will start to generate anomalies, the trained model should be able to recognize them.
 ---
 ### B. Using docker:
 #### Run the demo:
 **It's possible to run the demo on your computer using docker (no need for a VM), however, this will collect your machine's real metrics. In this case, please don't use your computer during the training since it might cause some unwanted anomalies.**
 
-**This will work on Mac and Linux, if you have windows you can run the commands inside `start_datapipline.sh` manually.**
+**This will work on Mac and Linux, if you have windows you can run the commands inside `start_datapipeline.sh` manually.**
 
 1. Clone the project:
     ```
@@ -130,13 +141,13 @@ This is the recommended way since its ready to run and metrics (CPU, RAM, ...) a
     cd fladdps_container
 
     # For x86 devices: 
-    ./start_datapipline.sh docker-compose-x86.yaml
+    ./start_datapipeline.sh docker-compose-x86.yaml
     # For arm devices: 
-    ./start_datapipline.sh docker-compose-arm.yaml
+    ./start_datapipeline.sh docker-compose-arm.yaml
     ```
     **Note**: You can stop it any time by pressing `ctrl + C` or force stop it by pressing `ctrl + C` twice.
 
-    **Note: The model will be trained on your machine's CPU metrics on real-time!** So make sure you don't use it during the training.
+    **Note: The model trains on your machine's real-time CPU metrics**, so avoid using your computer during this process to prevent unwanted anomalies.
 
     **Note:** It will take some time to pull the containers for the first time.
 3. Check the output in "Output" folder
@@ -169,7 +180,7 @@ This is the recommended way since its ready to run and metrics (CPU, RAM, ...) a
     ├── docker-compose-arm.yaml     # Docker compose file for arm
     ├── FLInstant                   # Files and configs related to Server, Client and Inference containers
     │   ├── config                  # Configs and start scripts
-    │   └── in_network_federaed_learning_for_anomaly_detection  # The source code
+    │   └── in_network_federated_learning_for_anomaly_detection  # The source code
     ├── live_plots.py               # To plot the inference results
     ├── NDBF                        # Files and configs related to data broker containrs
     │   └── config                  # Configs and start scripts
