@@ -145,7 +145,7 @@ def expand_decoded_batch(current_decoded_batches, batch_size):
 	
 	
 # Function to consume messages in batches with out polling 
-def consume_batches_preprocess(resource_name, initial_batch_size, consumer_topic, producer_topic_training, producer_topic_inference, iNDBF, eNDBF_):
+def consume_batches_preprocess(resource_name, initial_batch_size, consumer_topic, producer_topics_training, producer_topics_inference, iNDBF, eNDBF_):
 	
 
 	global eNDBF
@@ -201,8 +201,8 @@ def consume_batches_preprocess(resource_name, initial_batch_size, consumer_topic
 				sequence_dict_training_data = preprocess(decoded_batches_training, resource_name, timestamp_prep_start,timestamp_polling_start)
 				sequence_dict_inference_data = preprocess(decoded_batches_inference, resource_name, timestamp_prep_start,timestamp_polling_start)
 				
-			send_to_egress_NDBF(sequence_dict_training_data,eNDBF, producer_topic_training)
-			send_to_egress_NDBF(sequence_dict_inference_data,eNDBF, producer_topic_inference)
+			send_to_egress_NDBF(sequence_dict_training_data,eNDBF, producer_topics_training)
+			send_to_egress_NDBF(sequence_dict_inference_data,eNDBF, producer_topics_inference)
 			delta = get_ntp_server_time() - start_time
 			print('Receive ',message_count,' new network data samples')
 			print('Total number of batches: ',count_batch)
@@ -223,12 +223,17 @@ def consume_batches_preprocess(resource_name, initial_batch_size, consumer_topic
 			'''	
 				
 			
-def send_to_egress_NDBF(sequences_dict,eNDBF,producer_topic):
+def send_to_egress_NDBF(sequences_dict,eNDBF,producer_topics):
 	
 	sequences_dict_converted = convert_ndarray_to_list(sequences_dict)
 	json_value = json.dumps(sequences_dict_converted)
 	producer = KafkaProducer(bootstrap_servers=eNDBF, api_version=(0, 10))
-	producer.send(producer_topic, value=json_value.encode('utf-8'))			
+	for topic in producer_topics:
+		producer.send(topic, value=json_value.encode('utf-8'))			
+
+
+def parse_topic_argument(topic_arg):
+	return [topic.strip() for topic in topic_arg.split(',') if topic.strip()]
 	
 
 # Function to consume messages in batches with polling 
@@ -461,11 +466,11 @@ if __name__ == '__main__':
 	resource_name = sys.argv[2]
 	batch_size = int(sys.argv[3])
 	consumer_topic = sys.argv[4]
-	producer_topic1 = sys.argv[5]
-	producer_topic2 = sys.argv[6]
+	producer_topics1 = parse_topic_argument(sys.argv[5])
+	producer_topics2 = parse_topic_argument(sys.argv[6])
 	iNDBF = sys.argv[7]
 	eNDBF = sys.argv[8]
 
 	# Consume messages in batches and preprocess
-	consume_batches_preprocess(resource_name, batch_size,consumer_topic, producer_topic1,producer_topic2, iNDBF, eNDBF)
+	consume_batches_preprocess(resource_name, batch_size,consumer_topic, producer_topics1,producer_topics2, iNDBF, eNDBF)
 		

@@ -19,6 +19,11 @@ clients = {
         "path": "./Output/flclient-2/anomaly_detection.csv",
         "color": "orange",
         "anomaly_color": "green"
+    },
+    "flclient-3": {
+        "path": "./Output/flclient-3/anomaly_detection.csv",
+        "color": "purple",
+        "anomaly_color": "brown"
     }
 }
 
@@ -33,11 +38,11 @@ def read_csv_rows_incrementally(file_path, last_row_read):
     except Exception:
         return pd.DataFrame(), last_row_read
 
-# Wait until both files exist
-print("Waiting for both CSV files to appear...")
+# Wait until all files exist
+print("Waiting for all client CSV files to appear...")
 while not all(os.path.exists(cfg["path"]) for cfg in clients.values()):
     time.sleep(1)
-print("Both files detected. Starting plot...")
+print("All files detected. Starting plot...")
 
 # Initialize plot
 plt.ion()

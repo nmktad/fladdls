@@ -60,6 +60,44 @@ services:
         dps_1_network:
           ipv4_address: ${CLIENT_1_DATASOURCE_IP}
 
+    flclient-2:
+      container_name: flclient-2
+      image: registrylab.roc.cnam.fr/goyban/fladdps/flinstant:v1.2.2
+      env_file:
+        - .env
+      tty: true
+      depends_on:
+        - flserver
+        - ndppf_1
+      volumes:
+        - ./FLInstant/config:/app/confs
+        - ./Output/flclient-2:/in_network_federaed_learning_for_anomaly_detection/Output/Analysis/physical/
+      command: ["bash", "/app/confs/run_client.sh", "2"]
+      networks:
+        server_client_network:
+          ipv4_address: ${CLIENT_2_SERVER_IP}
+        dps_1_network:
+          ipv4_address: ${CLIENT_2_DATASOURCE_IP}
+
+    flclient-3:
+      container_name: flclient-3
+      image: registrylab.roc.cnam.fr/goyban/fladdps/flinstant:v1.2.2
+      env_file:
+        - .env
+      tty: true
+      depends_on:
+        - flserver
+        - ndppf_1
+      volumes:
+        - ./FLInstant/config:/app/confs
+        - ./Output/flclient-3:/in_network_federaed_learning_for_anomaly_detection/Output/Analysis/physical/
+      command: ["bash", "/app/confs/run_client.sh", "3"]
+      networks:
+        server_client_network:
+          ipv4_address: ${CLIENT_3_SERVER_IP}
+        dps_1_network:
+          ipv4_address: ${CLIENT_3_DATASOURCE_IP}
+
     flinference-1:
       container_name: flinference-1
       image: registrylab.roc.cnam.fr/goyban/fladdps/flinstant:v1.2.2
@@ -79,6 +117,44 @@ services:
         dps_1_network:
           ipv4_address: ${INFERENCE_1_DATASOURCE_IP}
 
+    flinference-2:
+      container_name: flinference-2
+      image: registrylab.roc.cnam.fr/goyban/fladdps/flinstant:v1.2.2
+      env_file:
+        - .env
+      tty: true
+      depends_on:
+        - flserver
+        - ndppf_1
+      volumes:
+        - ./FLInstant/config:/app/confs
+        - ./Output/flclient-2:/in_network_federaed_learning_for_anomaly_detection/Output/Analysis/physical/
+      command: ["bash", "/app/confs/run_inference.sh", "2"]
+      networks:
+        server_client_network:
+          ipv4_address: ${INFERENCE_2_SERVER_IP}
+        dps_1_network:
+          ipv4_address: ${INFERENCE_2_DATASOURCE_IP}
+
+    flinference-3:
+      container_name: flinference-3
+      image: registrylab.roc.cnam.fr/goyban/fladdps/flinstant:v1.2.2
+      env_file:
+        - .env
+      tty: true
+      depends_on:
+        - flserver
+        - ndppf_1
+      volumes:
+        - ./FLInstant/config:/app/confs
+        - ./Output/flclient-3:/in_network_federaed_learning_for_anomaly_detection/Output/Analysis/physical/
+      command: ["bash", "/app/confs/run_inference.sh", "3"]
+      networks:
+        server_client_network:
+          ipv4_address: ${INFERENCE_3_SERVER_IP}
+        dps_1_network:
+          ipv4_address: ${INFERENCE_3_DATASOURCE_IP}
+
     datasource-d1-i1:
       container_name: datasource-d1-i1
       image: registrylab.roc.cnam.fr/goyban/fladdps/datasource:v1.0.8
@@ -86,7 +162,7 @@ services:
         - .env
       tty: true
       depends_on:
-        - flclient-1
+        - indbf_1
       #cpus: 1
       volumes:
         - ./DATASOURCE/config:/app/confs
@@ -102,7 +178,7 @@ services:
         - .env
       tty: true
       depends_on:
-        - flclient-1
+        - indbf_1
       #cpus: 1
       volumes:
         - ./DATASOURCE/config:/app/confs
@@ -111,116 +187,69 @@ services:
         dps_1_network:
           ipv4_address: ${DATASOURCE_D1_I2_IP}
 
-    indbf_2:
-      container_name: indbf_kafka_2
-      image: registrylab.roc.cnam.fr/goyban/fladdps/ndbf:2.13-3.9.0
-      env_file:
-        - .env
-      tty: true
-      volumes:
-        - ./NDBF/config:/app/confs
-      command: ["bash", "/app/confs/run_broker.sh", "2", "i"]
-      networks:
-        dps_2_network:
-          ipv4_address: ${KAFKA_i2_IP}
-
-    endbf_2:
-      container_name: endbf_kafka_2
-      image: registrylab.roc.cnam.fr/goyban/fladdps/ndbf:2.13-3.9.0
-      env_file:
-        - .env
-      tty: true
-      volumes:
-        - ./NDBF/config:/app/confs
-      command: ["bash", "/app/confs/run_broker.sh", "2", "e"]
-      networks:
-        dps_2_network:
-          ipv4_address: ${KAFKA_e2_IP}
-
-    ndppf_2:
-      container_name: ndppf_2
-      image: registrylab.roc.cnam.fr/goyban/fladdps/ndppf:v1.0.0
-      env_file:
-        - .env
-      tty: true
-      depends_on:
-        - endbf_2
-        - indbf_2
-      volumes:
-        - ./NDPPF/config:/app/confs
-      command: ["bash", "/app/confs/run_ndppf.sh", "2"]
-      networks:
-        dps_2_network:
-          ipv4_address: ${NDPPF_2_IP}
-
-    flclient-2:
-      container_name: flclient-2
-      image: registrylab.roc.cnam.fr/goyban/fladdps/flinstant:v1.2.2
-      env_file:
-        - .env
-      tty: true
-      depends_on:
-        - flserver
-        - ndppf_2
-      volumes:
-        - ./FLInstant/config:/app/confs
-        - ./Output/flclient-2:/in_network_federaed_learning_for_anomaly_detection/Output/Analysis/physical/
-      command: ["bash", "/app/confs/run_client.sh", "2"]
-      networks:
-        server_client_network:
-          ipv4_address: ${CLIENT_2_SERVER_IP}
-        dps_2_network:
-          ipv4_address: ${CLIENT_2_DATASOURCE_IP}
-
-    flinference-2:
-      container_name: flinference-2
-      image: registrylab.roc.cnam.fr/goyban/fladdps/flinstant:v1.2.2
-      env_file:
-        - .env
-      tty: true
-      depends_on:
-        - ndppf_2
-      volumes:
-        - ./FLInstant/config:/app/confs
-        - ./Output/flclient-2:/in_network_federaed_learning_for_anomaly_detection/Output/Analysis/physical/
-      command: ["bash", "/app/confs/run_inference.sh", "2"]
-      networks:
-        server_client_network:
-          ipv4_address: ${INFERENCE_2_SERVER_IP}
-        dps_2_network:
-          ipv4_address: ${INFERENCE_2_DATASOURCE_IP}
-
-    datasource-d2-i1:
-      container_name: datasource-d2-i1
+    datasource-d1-i3:
+      container_name: datasource-d1-i3
       image: registrylab.roc.cnam.fr/goyban/fladdps/datasource:v1.0.8
       env_file:
         - .env
       tty: true
       depends_on:
-        - flclient-2
+        - indbf_1
       #cpus: 1
       volumes:
         - ./DATASOURCE/config:/app/confs
-      command: ["bash", "/app/confs/run_datasource.sh", "1", "2"]
+      command: ["bash", "/app/confs/run_datasource.sh", "3", "1"]
       networks:
-        dps_2_network:
-          ipv4_address: ${DATASOURCE_D2_I1_IP}
+        dps_1_network:
+          ipv4_address: ${DATASOURCE_D1_I3_IP}
 
-    datasource-d2-i2:
-      container_name: datasource-d2-i2
+    datasource-d1-i4:
+      container_name: datasource-d1-i4
       image: registrylab.roc.cnam.fr/goyban/fladdps/datasource:v1.0.8
       env_file:
         - .env
       tty: true
       depends_on:
-        - flclient-2
+        - indbf_1
       #cpus: 1
       volumes:
         - ./DATASOURCE/config:/app/confs
-      command: ["bash", "/app/confs/run_datasource.sh", "2", "2"]
+      command: ["bash", "/app/confs/run_datasource.sh", "4", "1"]
       networks:
-        dps_2_network:
-          ipv4_address: ${DATASOURCE_D2_I2_IP}
+        dps_1_network:
+          ipv4_address: ${DATASOURCE_D1_I4_IP}
+
+    datasource-d1-i5:
+      container_name: datasource-d1-i5
+      image: registrylab.roc.cnam.fr/goyban/fladdps/datasource:v1.0.8
+      env_file:
+        - .env
+      tty: true
+      depends_on:
+        - indbf_1
+      #cpus: 1
+      volumes:
+        - ./DATASOURCE/config:/app/confs
+      command: ["bash", "/app/confs/run_datasource.sh", "5", "1"]
+      networks:
+        dps_1_network:
+          ipv4_address: ${DATASOURCE_D1_I5_IP}
+
+    datasource-d1-i6:
+      container_name: datasource-d1-i6
+      image: registrylab.roc.cnam.fr/goyban/fladdps/datasource:v1.0.8
+      env_file:
+        - .env
+      tty: true
+      depends_on:
+        - indbf_1
+      #cpus: 1
+      volumes:
+        - ./DATASOURCE/config:/app/confs
+      command: ["bash", "/app/confs/run_datasource.sh", "6", "1"]
+      networks:
+        dps_1_network:
+          ipv4_address: ${DATASOURCE_D1_I6_IP}
 
     flserver:
       container_name: flserver
@@ -246,8 +275,3 @@ networks:
       ipam:
         config:
           - subnet: "${DPS_1_NETWORK_SUBNET}" 
-    dps_2_network:
-      driver: bridge
-      ipam:
-        config:
-          - subnet: "${DPS_2_NETWORK_SUBNET}" 

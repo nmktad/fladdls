@@ -5,7 +5,7 @@ echo "This is the server"
 # Run SSH setup in background
 echo "Starting SSH setup for clients..."
 chmod +x /app/confs/setup_ssh.sh
-/app/confs/setup_ssh.sh flclient-1 flclient-2 flinference-1 flinference-2 &
+/app/confs/setup_ssh.sh flclient-1 flclient-2 flclient-3 flinference-1 flinference-2 flinference-3 &
 SSH_PID=$!
 
 echo "Updating server config file ..."

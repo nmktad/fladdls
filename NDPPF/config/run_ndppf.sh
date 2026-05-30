@@ -21,6 +21,8 @@ echo "starting NDPPF_$1 post processing container ..."
 cp /app/confs/ndppf.py /network_data_preprocessing_function/
 
 cd /network_data_preprocessing_function
-echo "running: collected_cpu_topic_$1 preprocessed_cpu_topic_t_$1 preprocessed_cpu_topic_i_$1 ${IKAFKAIP}:${KAFKAPORT} ${EKAFKAIP}:${KAFKAPORT}"
-python3 ndppf.py polling cpu 100 collected_cpu_topic_$1 preprocessed_cpu_topic_t_$1 preprocessed_cpu_topic_i_$1 ${IKAFKAIP}:${KAFKAPORT} ${EKAFKAIP}:${KAFKAPORT}
+TRAINING_TOPICS="preprocessed_cpu_topic_t_1,preprocessed_cpu_topic_t_2,preprocessed_cpu_topic_t_3"
+INFERENCE_TOPICS="preprocessed_cpu_topic_i_1,preprocessed_cpu_topic_i_2,preprocessed_cpu_topic_i_3"
+echo "running: collected_cpu_topic_$1 ${TRAINING_TOPICS} ${INFERENCE_TOPICS} ${IKAFKAIP}:${KAFKAPORT} ${EKAFKAIP}:${KAFKAPORT}"
+python3 ndppf.py polling cpu 100 collected_cpu_topic_$1 ${TRAINING_TOPICS} ${INFERENCE_TOPICS} ${IKAFKAIP}:${KAFKAPORT} ${EKAFKAIP}:${KAFKAPORT}
 # sleep infinity
