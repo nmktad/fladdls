@@ -234,10 +234,11 @@ def send_to_egress_NDBF(sequences_dict,eNDBF,producer_topics, load_balance=False
 	json_value = json.dumps(sequences_dict_converted)
 	producer = KafkaProducer(bootstrap_servers=eNDBF, api_version=(0, 10))
 	if load_balance:
-		probabilities = [1 / len(producer_topics)] * len(producer_topics)
 		if LOAD_BALANCING_SCENARIO == "2":
 			probabilities = [0.2, 0.3, 0.5]
-		selected_topic = np.random.choice(producer_topics, p=probabilities)
+			selected_topic = np.random.choice(producer_topics, p=probabilities)
+		else:
+			selected_topic = np.random.choice(producer_topics)
 		print("Training load balancing scenario:", LOAD_BALANCING_SCENARIO, "selected topic:", selected_topic)
 		producer.send(selected_topic, value=json_value.encode('utf-8'))
 		return
