@@ -1,6 +1,7 @@
 from kafka import KafkaConsumer, KafkaProducer
 import sys
 import json
+import os
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 import time
@@ -33,6 +34,10 @@ current_batch_size=0,
 new_batch_size=0, 
 deployment_stability=False
 inference_data_portion = 0.0
+
+# Training load balancing scenarios:
+# 1 = uniform routing across clients, 2 = weighted routing: 20%, 30%, 50%.
+LOAD_BALANCING_SCENARIO = os.getenv("LOAD_BALANCING_SCENARIO", "1")
 
 # Create Kafka consumer and producer
 
@@ -201,7 +206,7 @@ def consume_batches_preprocess(resource_name, initial_batch_size, consumer_topic
 				sequence_dict_training_data = preprocess(decoded_batches_training, resource_name, timestamp_prep_start,timestamp_polling_start)
 				sequence_dict_inference_data = preprocess(decoded_batches_inference, resource_name, timestamp_prep_start,timestamp_polling_start)
 				
-			send_to_egress_NDBF(sequence_dict_training_data,eNDBF, producer_topics_training)
+			send_to_egress_NDBF(sequence_dict_training_data,eNDBF, producer_topics_training, load_balance=True)
 			send_to_egress_NDBF(sequence_dict_inference_data,eNDBF, producer_topics_inference)
 			delta = get_ntp_server_time() - start_time
 			print('Receive ',message_count,' new network data samples')
@@ -223,11 +228,20 @@ def consume_batches_preprocess(resource_name, initial_batch_size, consumer_topic
 			'''	
 				
 			
-def send_to_egress_NDBF(sequences_dict,eNDBF,producer_topics):
+def send_to_egress_NDBF(sequences_dict,eNDBF,producer_topics, load_balance=False):
 	
 	sequences_dict_converted = convert_ndarray_to_list(sequences_dict)
 	json_value = json.dumps(sequences_dict_converted)
 	producer = KafkaProducer(bootstrap_servers=eNDBF, api_version=(0, 10))
+	if load_balance:
+		probabilities = [1 / len(producer_topics)] * len(producer_topics)
+		if LOAD_BALANCING_SCENARIO == "2":
+			probabilities = [0.2, 0.3, 0.5]
+		selected_topic = np.random.choice(producer_topics, p=probabilities)
+		print("Training load balancing scenario:", LOAD_BALANCING_SCENARIO, "selected topic:", selected_topic)
+		producer.send(selected_topic, value=json_value.encode('utf-8'))
+		return
+
 	for topic in producer_topics:
 		producer.send(topic, value=json_value.encode('utf-8'))			
 
