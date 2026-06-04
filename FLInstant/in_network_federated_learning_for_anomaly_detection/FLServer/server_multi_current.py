@@ -217,6 +217,8 @@ class FLServer(FederatedLearningServicer):
         self.folder_string = f"{time.strftime(tformated, time.localtime())}"
 
         self.client_to_send_global_model = {}
+        # SCAFFOLD server control variates, one list of tensors per resource.
+        self.server_controls = {CPU: None, MEMORY: None, NETWORK: None, DISK: None}
 
     def set_client_to_send_global_model(self, client_to_send_global_model):
         self.client_to_send_global_model = client_to_send_global_model
@@ -301,6 +303,7 @@ class FLServer(FederatedLearningServicer):
                 "weights": pickle.loads(s_model),
                 "algorithm": self.fl_algorithm,
                 "fedprox_mu": self.fedprox_mu,
+                "server_control": self.server_controls.get(resource_name),
             }
         )
 
@@ -718,10 +721,17 @@ class FLServer(FederatedLearningServicer):
 
     def average_keras_models(self, sampled_client_keys, resource_name):
         local_params = []
+        control_deltas = []
         for it, key_ in enumerate(sampled_client_keys):
             ts = time.perf_counter()
             # local_weights = self.client_with_local_model_copy[key_].model.get_weights()
-            local_weights = self.client_with_local_model_copy[resource_name][key_].model
+            local_model = self.client_with_local_model_copy[resource_name][key_].model
+            if isinstance(local_model, dict):
+                local_weights = local_model["weights"]
+                if "control_delta" in local_model:
+                    control_deltas.append(local_model["control_delta"])
+            else:
+                local_weights = local_model
             local_params.append(local_weights)
             # print(f'\t model returned from client[{idx}] in {(time.perf_counter() - ts):0.5f} seconds')
 
@@ -729,6 +739,14 @@ class FLServer(FederatedLearningServicer):
         # avg_model = np.average(local_params, axis=0, dtype=object)
         avg_model = np.mean(local_params, axis=0, dtype=object)
         # self.global_model.set_weights(avg_model)
+        if self.fl_algorithm == "scaffold" and control_deltas:
+            avg_delta = np.mean(np.array(control_deltas, dtype=object), axis=0, dtype=object)
+            if self.server_controls[resource_name] is None:
+                self.server_controls[resource_name] = [np.zeros_like(w) for w in avg_delta]
+            # Server control update: c <- c + mean(delta_c_i).
+            self.server_controls[resource_name] = [
+                c + d for c, d in zip(self.server_controls[resource_name], avg_delta)
+            ]
         return avg_model
 
     def sample_clients_(self):

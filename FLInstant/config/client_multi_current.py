@@ -189,6 +189,9 @@ class Client:
         self.fl_algorithm = os.environ.get("FED_CONFIG_ALGORITHM", "fedavg").lower()
         self.fedprox_mu = float(os.environ.get("FEDPROX_MU", "0.01"))
         self.global_weights_snapshot = None
+        self.client_controls = {}
+        self.server_controls = {}
+        self.control_deltas = {}
 
         self.nnModel = None
         self.training_func = None
@@ -291,6 +294,15 @@ class Client:
         self.model_exchange_time = time.time() - ts
         return g_model
 
+    def get_local_model_payload(self, resource_name, local_model):
+        # SCAFFOLD sends both model weights and the client control update.
+        if self.fl_algorithm == "scaffold":
+            return {
+                "weights": local_model.get_weights(),
+                "control_delta": self.control_deltas.get(resource_name),
+            }
+        return local_model.get_weights()
+
     def update_local_model(self, resource_name, current_local_model):
 
         s_model = pickle.dumps(current_local_model)
@@ -315,11 +327,17 @@ class Client:
             global_model_weights = raw["weights"]
             self.fl_algorithm = raw.get("algorithm", "fedavg")
             self.fedprox_mu = raw.get("fedprox_mu", 0.01)
+            self.server_controls[resource_name] = raw.get("server_control")
         else:
             global_model_weights = raw
 
         # FedProx penalizes drift from these received global weights during local training.
         self.global_weights_snapshot = [w.copy() for w in global_model_weights]
+        if self.fl_algorithm == "scaffold":
+            if self.server_controls.get(resource_name) is None:
+                self.server_controls[resource_name] = [np.zeros_like(w) for w in global_model_weights]
+            if resource_name not in self.client_controls:
+                self.client_controls[resource_name] = [np.zeros_like(w) for w in global_model_weights]
         self.global_model[resource_name].set_weights(global_model_weights)
         return self.global_model[resource_name]
 
@@ -448,8 +466,24 @@ class Client:
 
         st = datetime.now()
 
+        if self.fl_algorithm == "scaffold" and self.global_weights_snapshot is not None:
+            # SCAFFOLD corrects local gradients using client/server control variates.
+            history, new_control, control_delta = keras_lstm_training_scaffold(
+                x_train,
+                y_train,
+                self.epochs,
+                k_model,
+                global_weights=self.global_weights_snapshot,
+                client_control=self.client_controls[resource_name],
+                server_control=self.server_controls[resource_name],
+                learning_rate=self.learning_rate,
+                batch_size=self.batch_size,
+                verbose=vr,
+            )
+            self.client_controls[resource_name] = new_control
+            self.control_deltas[resource_name] = control_delta
         # FedProx changes only the local client objective; server aggregation stays unchanged.
-        if self.fl_algorithm == "fedprox" and self.global_weights_snapshot is not None:
+        elif self.fl_algorithm == "fedprox" and self.global_weights_snapshot is not None:
             history = keras_lstm_training_fedprox(
                 x_train,
                 y_train,
@@ -587,6 +621,8 @@ class Client:
             self.global_model[resource_name] = init_model
             # Initial model also needs a snapshot for FedProx before the first aggregation reply.
             self.global_weights_snapshot = [w.copy() for w in init_model.get_weights()]
+            self.server_controls[resource_name] = [np.zeros_like(w) for w in init_model.get_weights()]
+            self.client_controls[resource_name] = [np.zeros_like(w) for w in init_model.get_weights()]
 
             self.do_training(
                 db_splits_count=math.ceil(self.total_rounds / self.rounds),
@@ -855,8 +891,9 @@ class Client:
                     epoch_ = epoch_ + 1
                     count_discarded_data = 0
 
+                payload = self.get_local_model_payload(resource_name, local_model)
                 g_model_ = self.transmit_local_model(
-                    resource_name=resource_name, local_model=local_model.get_weights()
+                    resource_name=resource_name, local_model=payload
                 )
                 # unpickle parameters and model
                 g_model = self.get_fl_global_model(
@@ -964,6 +1001,59 @@ def keras_lstm_training_fedprox(
     # Restore the original loss so future non-FedProx training is not affected.
     model.compile(optimizer=model.optimizer, loss=original_loss)
     return history
+
+
+def keras_lstm_training_scaffold(
+    X,
+    y,
+    epochs,
+    model,
+    global_weights,
+    client_control,
+    server_control,
+    learning_rate,
+    batch_size=64,
+    verbose=0,
+):
+    dataset = tf.data.Dataset.from_tensor_slices((X, y)).batch(batch_size)
+    loss_fn = tf.keras.losses.MeanSquaredError()
+    losses = []
+
+    for epoch in range(epochs):
+        epoch_losses = []
+        for batch_x, batch_y in dataset:
+            with tf.GradientTape() as tape:
+                prediction = model(batch_x, training=True)
+                loss = loss_fn(batch_y, prediction)
+            gradients = tape.gradient(loss, model.trainable_weights)
+            # SCAFFOLD gradient correction: grad <- grad - c_i + c.
+            corrected_gradients = [
+                grad - tf.cast(c_local, grad.dtype) + tf.cast(c_server, grad.dtype)
+                for grad, c_local, c_server in zip(gradients, client_control, server_control)
+            ]
+            model.optimizer.apply_gradients(zip(corrected_gradients, model.trainable_weights))
+            epoch_losses.append(float(loss))
+        losses.append(float(np.mean(epoch_losses)))
+        if verbose:
+            print(f"SCAFFOLD epoch {epoch + 1}/{epochs} loss={losses[-1]:.6f}")
+
+    local_weights = model.get_weights()
+    local_steps = max(1, epochs * int(np.ceil(len(X) / batch_size)))
+    # Client control update from SCAFFOLD: c_i^+ = c_i - c + (w_global - w_local)/(K*eta).
+    new_control = [
+        c_local - c_server + (w_global - w_local) / (local_steps * learning_rate)
+        for c_local, c_server, w_global, w_local in zip(
+            client_control, server_control, global_weights, local_weights
+        )
+    ]
+    control_delta = [new - old for new, old in zip(new_control, client_control)]
+
+    class History:
+        pass
+
+    history = History()
+    history.history = {"loss": losses}
+    return history, new_control, control_delta
 
 
 def _append_loss_to_csv(round_loss, round_no, algorithm):
