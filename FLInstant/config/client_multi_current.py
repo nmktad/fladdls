@@ -29,14 +29,12 @@ from datetime import datetime
 # from tf_keras_pickel_solution import make_keras_picklable
 from Data_operations.DTAT_LAKE import get_data_batch, load_database_file_split
 
-from Colors.print_colors import (print_purple,
-                                 print_blue,
-                                 print_cyne,
-                                 print_orange)
+from Colors.print_colors import print_purple, print_blue, print_cyne, print_orange
 
 import Data_operations.DataOperations as do
 import Data_operations.DataAnalysis as da
 import keras
+import tensorflow as tf
 
 
 from keras.models import model_from_json
@@ -46,9 +44,9 @@ from ProducerConsumer import OnlineConsumer
 
 ROOT_DIR = os.getcwd()
 ROOT_DIR = ROOT_DIR.split("/")
-ROOT_DIR = ROOT_DIR[:len(ROOT_DIR) - 1]
+ROOT_DIR = ROOT_DIR[: len(ROOT_DIR) - 1]
 ROOT_DIR = "/".join(ROOT_DIR)
-sys.path.insert(0, f'{ROOT_DIR}/Utils')
+sys.path.insert(0, f"{ROOT_DIR}/Utils")
 import utils
 
 gRPC_MESSAGE_MAX_LENGTH = 4194304 - 4  # 4 bytes are removed
@@ -75,7 +73,6 @@ ENB = do.ENB
 from enum import Enum
 
 
-
 class KerasVerbosity(Enum):
     silent = 0
     progress_bar = 1
@@ -88,31 +85,32 @@ class Client:
     # pipeline arguments
 
     _options = [
-        ('grpc.max_send_message_length', MAX_MESSAGE_LENGTH),
-        ('grpc.max_receive_message_length', MAX_MESSAGE_LENGTH)
+        ("grpc.max_send_message_length", MAX_MESSAGE_LENGTH),
+        ("grpc.max_receive_message_length", MAX_MESSAGE_LENGTH),
     ]
 
-    def __init__(self,
-                 client_id,
-                 client_str,
-                 training_data_dir_path,
-                 analysis_dir_path,
-                 target="localhost:50055",
-                 running_mode={},
-                 rounds=0,
-                 epochs_before_aggregation=0,
-                 data_splits_count=0,  # no of days to go through
-                 options=_options,
-                 rsc_target="",
-                 layer="",
-                 data_lake_param={},
-                 quantile=0.999,
-                 number_of_participants=0,
-                 test_data_percent=0.01,
-                 no_training_samples=0,
-                 lr=0.001,
-                 data_pipeline_parameter={}
-                 ):
+    def __init__(
+        self,
+        client_id,
+        client_str,
+        training_data_dir_path,
+        analysis_dir_path,
+        target="localhost:50055",
+        running_mode={},
+        rounds=0,
+        epochs_before_aggregation=0,
+        data_splits_count=0,  # no of days to go through
+        options=_options,
+        rsc_target="",
+        layer="",
+        data_lake_param={},
+        quantile=0.999,
+        number_of_participants=0,
+        test_data_percent=0.01,
+        no_training_samples=0,
+        lr=0.001,
+        data_pipeline_parameter={},
+    ):
 
         self.producer_sleep_time_interval = 0.00
         # self.connect_to_data_pipeline = False
@@ -125,11 +123,15 @@ class Client:
             clientId=client_str,
             clientName=platform.uname()[1],  # node
             # TODO: Replace [currently used to tell server the the calculated no of rounds]
-            clientToken=str(rounds * data_splits_count),  # change the name in proto files later on NOT USED RIGHT NOW
-            machineName='Salah Bin',  # TODO:    Replace
+            clientToken=str(
+                rounds * data_splits_count
+            ),  # change the name in proto files later on NOT USED RIGHT NOW
+            machineName="Salah Bin",  # TODO:    Replace
             machineHW=platform.uname()[4],  # machine
         )
-        self.rsc_target = rsc_target  # TODO: just for the sake of the out put: modify to be general
+        self.rsc_target = (
+            rsc_target  # TODO: just for the sake of the out put: modify to be general
+        )
         self.client_id = client_id
         self.analysis_data_dir_path = analysis_dir_path
         self.client_count = 2
@@ -139,8 +141,7 @@ class Client:
         self.conn = tr_rpc.FederatedLearningStub(self.channel)
 
         self.transmit_funcs = self.conn.TheMessageCPU
-        
-        
+
         """
         {CPU: self.conn.TheMessageCPU,
                                MEMORY: self.conn.TheMessageMemory,
@@ -149,25 +150,30 @@ class Client:
         """
 
         # self.full_dataset = full_dataset
-        self.test_dataset = {CPU: None,
-                             MEMORY: None,
-                             NETWORK: None,
-                             DISK: None,
-                             ENB: None
-                             }
+        self.test_dataset = {
+            CPU: None,
+            MEMORY: None,
+            NETWORK: None,
+            DISK: None,
+            ENB: None,
+        }
 
-        self.global_model = {CPU: None,
-                             MEMORY: None,
-                             NETWORK: None,
-                             DISK: None,
-                             ENB: None}
-        self.local_model = {CPU: None,
-                            MEMORY: None,
-                            NETWORK: None,
-                            DISK: None,
-                             ENB: None}
+        self.global_model = {
+            CPU: None,
+            MEMORY: None,
+            NETWORK: None,
+            DISK: None,
+            ENB: None,
+        }
+        self.local_model = {
+            CPU: None,
+            MEMORY: None,
+            NETWORK: None,
+            DISK: None,
+            ENB: None,
+        }
 
-        self.model_type = ''
+        self.model_type = ""
         self.current_round = 0
         self.current_epochs_before_aggregation = 1
         self.total_rounds = rounds * data_splits_count
@@ -179,31 +185,39 @@ class Client:
         self.segment_size = -1
         self.chunk_count = 1
         self.learning_rate = lr
+        # Default from env for the first round; later rounds use server metadata.
+        self.fl_algorithm = os.environ.get("FED_CONFIG_ALGORITHM", "fedavg").lower()
+        self.fedprox_mu = float(os.environ.get("FEDPROX_MU", "0.01"))
+        self.global_weights_snapshot = None
 
         self.nnModel = None
         self.training_func = None
-        self.training_data = {CPU: None,
-                              MEMORY: None,
-                              NETWORK: None,
-                              DISK: None,
-                             ENB: None
-                              }
+        self.training_data = {
+            CPU: None,
+            MEMORY: None,
+            NETWORK: None,
+            DISK: None,
+            ENB: None,
+        }
 
-        self.evaluation_data = {CPU: None,
-                                MEMORY: None,
-                                NETWORK: None,
-                                DISK: None,
-                             ENB: None
-                                }
+        self.evaluation_data = {
+            CPU: None,
+            MEMORY: None,
+            NETWORK: None,
+            DISK: None,
+            ENB: None,
+        }
 
         self.training_finished = False
 
         self.counter = 0
-        self.print = {CPU: print_orange,
-                      MEMORY: print_purple,
-                      NETWORK: print_blue,
-                      DISK: print_cyne,
-                      ENB: print_orange}
+        self.print = {
+            CPU: print_orange,
+            MEMORY: print_purple,
+            NETWORK: print_blue,
+            DISK: print_cyne,
+            ENB: print_orange,
+        }
 
         self.round_analysis = []
         self.full_analysis = {str(client_id): {}}
@@ -246,14 +260,18 @@ class Client:
         # train_predicted = model.predict(train_data)
         sys.setrecursionlimit(3000)
 
-
     def prepare_model_to_send(self, resource_name, local_model):
         # print(' In def get_model_chunks(self)')
         s_model = pickle.dumps(local_model)  # * random.randint(1, 10))
-        self.local_model_size = sys.getsizeof(s_model) 
-        print(f'model size = {self.local_model_size}')
+        self.local_model_size = sys.getsizeof(s_model)
+        print(f"model size = {self.local_model_size}")
 
-        return tr.Model(resource_name=resource_name, parameters=s_model, client=self.client_crd, act_time=time.time())
+        return tr.Model(
+            resource_name=resource_name,
+            parameters=s_model,
+            client=self.client_crd,
+            act_time=time.time(),
+        )
 
     def transmit_local_model(self, resource_name, local_model):
         t_start = time.time()
@@ -261,35 +279,54 @@ class Client:
 
         l_model = self.prepare_model_to_send(resource_name, local_model)
         ts = time.time()
-        lcl_t = f'{time.strftime("%H:%M:%S", time.localtime())}'
-        self.print[resource_name](f'At {lcl_t} {resource_name} local trained model transmit starting  ')
+        lcl_t = f"{time.strftime('%H:%M:%S', time.localtime())}"
+        self.print[resource_name](
+            f"At {lcl_t} {resource_name} local trained model transmit starting  "
+        )
         g_model = self.transmit_funcs(l_model)
-        Ucl_t = f'{time.strftime("%H:%M:%S", time.localtime())}'
-        self.print[resource_name](f'At {Ucl_t} {resource_name} local trained model transmit finish  ')
+        Ucl_t = f"{time.strftime('%H:%M:%S', time.localtime())}"
+        self.print[resource_name](
+            f"At {Ucl_t} {resource_name} local trained model transmit finish  "
+        )
         self.model_exchange_time = time.time() - ts
         return g_model
-    
-    def update_local_model(self, resource_name,current_local_model):
-        
+
+    def update_local_model(self, resource_name, current_local_model):
+
         s_model = pickle.dumps(current_local_model)
-        model = tr.Model(resource_name=resource_name, parameters=s_model, client=self.client_crd, act_time=time.time())
+        model = tr.Model(
+            resource_name=resource_name,
+            parameters=s_model,
+            client=self.client_crd,
+            act_time=time.time(),
+        )
         local_model = pickle.loads(model.parameters)
         self.global_model[resource_name].set_weights(local_model)
         return self.global_model[resource_name]
-        
+
     def get_fl_global_model(self, resource_name, model):
-        self.global_model_size = sys.getsizeof(pickle.dumps(model)) 
+        self.global_model_size = sys.getsizeof(pickle.dumps(model))
         print("Dumpted model")
         print(self.global_model_size)
         g_model = model.parameters
-        global_model_weights = pickle.loads(g_model)
+        raw = pickle.loads(g_model)
+        # New server payload includes weights plus algorithm parameters; raw weights remain supported.
+        if isinstance(raw, dict):
+            global_model_weights = raw["weights"]
+            self.fl_algorithm = raw.get("algorithm", "fedavg")
+            self.fedprox_mu = raw.get("fedprox_mu", 0.01)
+        else:
+            global_model_weights = raw
+
+        # FedProx penalizes drift from these received global weights during local training.
+        self.global_weights_snapshot = [w.copy() for w in global_model_weights]
         self.global_model[resource_name].set_weights(global_model_weights)
         return self.global_model[resource_name]
 
     def select_training_frmwrk(self, training_data, resource_name, g_model):
-        if self.model_type.lower() == 'torch':
+        if self.model_type.lower() == "torch":
             return self.train_torch_model(resource_name, g_model)
-        elif self.model_type.lower() == 'keras':
+        elif self.model_type.lower() == "keras":
             return self.train_keras_model(training_data, resource_name, g_model)
 
     def send_heartbeat(self):
@@ -297,7 +334,6 @@ class Client:
             while not self.training_finished:
                 rsp = self.conn.Heartbeat(self.client_crd)
                 time.sleep(CHECK_IS_ALIVE_INTERVAL)
-
 
         except Exception:
             print("Gone ")
@@ -307,32 +343,36 @@ class Client:
     # First contact with server
 
     def register_client(self):
-        rsp = tr.RegistrationParams(clientCredentials=self.client_crd, verbose=True, resource_name=self.rsc_target,
-                                    client_count=self.client_count)
+        rsp = tr.RegistrationParams(
+            clientCredentials=self.client_crd,
+            verbose=True,
+            resource_name=self.rsc_target,
+            client_count=self.client_count,
+        )
 
         print_blue("Try to register client with FL server ")
         t = time.time()
         rsp = self.conn.ClientRegistration(rsp)
         if rsp.registered:
-            print(f'client  registered successfully in [{time.time() - t}] sec')
+            print(f"client  registered successfully in [{time.time() - t}] sec")
             self.get_init_global_model_and_init_params()
 
     def get_init_global_model_and_init_params(self):
 
         # try:
-        print_orange(f'Getting global model and init params ... ')
+        print_orange(f"Getting global model and init params ... ")
         t_start = time.time()
         tmf = self.conn.TransmitInitializationParams(self.client_crd)
         self.model_exchange_time = time.time() - t_start
-        print_orange(f'Global model and init params received in {self.model_exchange_time}')
+        print_orange(
+            f"Global model and init params received in {self.model_exchange_time}"
+        )
 
         self.epochs = tmf.epochs
         self.batch_size = tmf.batchSize
-        self.training_func = keras_lstm_training  
-
+        self.training_func = keras_lstm_training
 
         self.global_model[self.rsc_target] = tmf.initialModel
-
 
         self.model_type = tmf.modelType
 
@@ -354,37 +394,46 @@ class Client:
 
         if len(self.running_mode.keys()) > 0:
             if self.running_mode["mode"].lower() == "batch":
-
                 segment_size = self.segment_size  # self.running_mode["batch_size"]
-                train_data_segment = get_data_batch(training_data, segment_size, inter_round, self.rounds)
+                train_data_segment = get_data_batch(
+                    training_data, segment_size, inter_round, self.rounds
+                )
 
+        print_purple(
+            f"data size: {sys.getsizeof(self.training_data[resource_name]):,} byte"
+        )
 
-        print_purple(f"data size: {sys.getsizeof(self.training_data[resource_name]):,} byte")
+        print_purple(
+            f"training data segment: {sys.getsizeof(train_data_segment):,} byte"
+        )
 
-        print_purple(f"training data segment: {sys.getsizeof(train_data_segment):,} byte")
-
-        print_orange(f"training sigment shape: {train_data_segment.shape} of  {training_data.shape}")
+        print_orange(
+            f"training sigment shape: {train_data_segment.shape} of  {training_data.shape}"
+        )
 
         return train_data_segment
+
     def train_keras_model(self, train_data_segment, resource_name, k_model):
         # if self.current_round <= self.total_rounds - 1:
-        print_cyne(f'{resource_name} Starting ->[Round  : {self.current_round}/{self.total_rounds}]')
-        print_cyne(f'{resource_name} Starting ->[Inter round  : {self.current_epochs_before_aggregation}/{self.epochs_before_aggregation}]')
+        print_cyne(
+            f"{resource_name} Starting ->[Round  : {self.current_round}/{self.total_rounds}]"
+        )
+        print_cyne(
+            f"{resource_name} Starting ->[Inter round  : {self.current_epochs_before_aggregation}/{self.epochs_before_aggregation}]"
+        )
 
         is_file_loaded = False
-
 
         x_train = train_data_segment
         y_train = x_train
 
-        print_cyne('Got From Server')
-
+        print_cyne("Got From Server")
 
         # insure they have same no of samples: utilize the larger
         if x_train.shape[0] < y_train.shape[0]:
-            y_train = y_train[:x_train.shape[0]]
+            y_train = y_train[: x_train.shape[0]]
         elif x_train.shape[0] > y_train.shape[0]:
-            x_train = x_train[:y_train.shape[0]]
+            x_train = x_train[: y_train.shape[0]]
 
         x_train = np.flip(x_train, axis=0)
         y_train = np.flip(y_train, axis=0)
@@ -395,32 +444,53 @@ class Client:
 
         s_t = time.time()
         st_t = time.strftime("%H:%M:%S", time.localtime())
-        print(f'Training started at:{st_t}')
+        print(f"Training started at:{st_t}")
 
         st = datetime.now()
 
-        self.training_func(x_train, y_train,
-                           self.epochs,
-                           k_model,
-                           batch_size=self.batch_size,
-                           verbose=vr)
+        # FedProx changes only the local client objective; server aggregation stays unchanged.
+        if self.fl_algorithm == "fedprox" and self.global_weights_snapshot is not None:
+            history = keras_lstm_training_fedprox(
+                x_train,
+                y_train,
+                self.epochs,
+                k_model,
+                global_weights=self.global_weights_snapshot,
+                mu=self.fedprox_mu,
+                batch_size=self.batch_size,
+                verbose=vr,
+            )
+        else:
+            history = self.training_func(
+                x_train,
+                y_train,
+                self.epochs,
+                k_model,
+                batch_size=self.batch_size,
+                verbose=vr,
+            )
+
+        if history is not None:
+            round_loss = float(np.mean(history.history["loss"]))
+            _append_loss_to_csv(round_loss, self.current_round, self.fl_algorithm)
 
         edt = datetime.now()
 
         ed_t = time.strftime("%H:%M:%S", time.localtime())
-        print(f'Trining ended at:{ed_t}')
+        print(f"Trining ended at:{ed_t}")
         e_t = time.time()
         t_t = e_t - s_t
-        self.training_time = str(edt - st)   #get_formatted_elapsed_time(s_t)
+        self.training_time = str(edt - st)  # get_formatted_elapsed_time(s_t)
         t_t = time.strftime("%H:%M:%S", time.gmtime(t_t))
-        print(f'Training time {self.training_time}')
+        print(f"Training time {self.training_time}")
 
         print("=" * 80)
         return k_model
 
     def inter_round_data_analysis(self, x_train, resource_name, k_model, ds_mnt):
-        train_MSE, round_threshold = self.get_data_analysis(resource_name, k_model, x_train,
-                                                            self.test_dataset[resource_name])
+        train_MSE, round_threshold = self.get_data_analysis(
+            resource_name, k_model, x_train, self.test_dataset[resource_name]
+        )
 
         # Update incremental MSE
         self.incremental_MSE = np.concatenate((self.incremental_MSE, train_MSE))
@@ -436,26 +506,28 @@ class Client:
 
         print("=" * 80)
 
-        dtan = {"client_id": self.client_id,
-                "round_no": int(self.current_round),
-                "training_time (secs)": self.training_time,
-                # "train_MSE": train_MSe,
-                "incremental_MSE_Min": np.min(self.incremental_MSE),
-                "incremental_MSE_Median": np.median(self.incremental_MSE),
-                "incremental_MSE_Max": np.max(self.incremental_MSE),
-                "average_MSE": np.mean(train_MSE),
-                # "test_MSE_loss": test_MSE_loss,
-                "round_threshold": round_threshold,
-                "threshold": threshold,
-                "model_round_trip": self.model_exchange_time
-                }
-        
-        dir_name = f'{self.analysis_data_dir_path}/{self.layer}'
-        fullpath = os.path.join(dir_name, f'runtime_analysis.json')
-        fullpath_history = os.path.join(dir_name, f'runtime_analysis_history.json')
+        dtan = {
+            "client_id": self.client_id,
+            "round_no": int(self.current_round),
+            "training_time (secs)": self.training_time,
+            # "train_MSE": train_MSe,
+            "incremental_MSE_Min": np.min(self.incremental_MSE),
+            "incremental_MSE_Median": np.median(self.incremental_MSE),
+            "incremental_MSE_Max": np.max(self.incremental_MSE),
+            "average_MSE": np.mean(train_MSE),
+            # "test_MSE_loss": test_MSE_loss,
+            "round_threshold": round_threshold,
+            "threshold": threshold,
+            "model_round_trip": self.model_exchange_time,
+        }
+
+        dir_name = f"{self.analysis_data_dir_path}/{self.layer}"
+        fullpath = os.path.join(dir_name, f"runtime_analysis.json")
+        fullpath_history = os.path.join(dir_name, f"runtime_analysis_history.json")
         do.save_json_to_file(dtan, fullpath)
         self.round_analysis.append(dtan)
         appends_to_json_file(dtan, fullpath_history)
+
     def train_torch_model(self, resource_name, nn_model):
         inputDim = 1  # takes variable 'x'
         outputDim = 1  # takes variable 'y'
@@ -471,28 +543,29 @@ class Client:
         criterion = nn.MSELoss()
         optimizer = th.optim.SGD(model.parameters(), lr=learningRate)
 
-
         x_train = self.training_data[resource_name]
         y_train = self.evaluation_data[resource_name]
 
         local_weights = model.state_dict()
 
-        print_cyne('Got From Server')
+        print_cyne("Got From Server")
         for key in model.state_dict().keys():
-            print_cyne(f'{key} = {local_weights[key]}')
+            print_cyne(f"{key} = {local_weights[key]}")
 
         if not self.training_finished:
-            self.training_func(x_train, y_train, self.epochs, model, optimizer, criterion)
+            self.training_func(
+                x_train, y_train, self.epochs, model, optimizer, criterion
+            )
             # self.local_model = model
             self.local_model[resource_name] = model.state_dict()
 
-        print_cyne('Will Send To Server')
+        print_cyne("Will Send To Server")
         for key in model.state_dict().keys():
-            print(print_cyne(f'{key} = {local_weights[key]}'))
+            print(print_cyne(f"{key} = {local_weights[key]}"))
 
         """""
         self.global_model used for training and the result is saved in self.local_model 
-        """""
+        """ ""
 
     # TODO Be CHANGED FOR model JSON AND WEIGHTs
     def ready_to_start(self, resource_name):
@@ -500,38 +573,45 @@ class Client:
         response = self.conn.StartTraining(self.client_crd)
         self.start_timestamp = time.time()
         self.start_time = time.localtime()
-        print(f'Ready to start = {response}   {time.strftime("%H:%M:%S", self.start_time)}')
+        print(
+            f"Ready to start = {response}   {time.strftime('%H:%M:%S', self.start_time)}"
+        )
         if response.response:
             # self.print[resource_name]("----> ", resource_name)
             print_purple("GET + RESPONSE")
             g_model = self.global_model[resource_name]
             # ----------------------------------------------
             init_model = pickle.loads(g_model)
-            self.global_model_size = sys.getsizeof(init_model) 
+            self.global_model_size = sys.getsizeof(init_model)
 
             self.global_model[resource_name] = init_model
+            # Initial model also needs a snapshot for FedProx before the first aggregation reply.
+            self.global_weights_snapshot = [w.copy() for w in init_model.get_weights()]
 
-            self.do_training(db_splits_count=math.ceil(self.total_rounds / self.rounds), resource_name=resource_name,
-                             init_model=init_model)
+            self.do_training(
+                db_splits_count=math.ceil(self.total_rounds / self.rounds),
+                resource_name=resource_name,
+                init_model=init_model,
+            )
         else:
-            print('Can not start training right now. Try to start another time')
+            print("Can not start training right now. Try to start another time")
 
     def feedback_type(self):
-        print('feedback_type')
+        print("feedback_type")
 
     # ML model summery: layers, neurons
     # TODO MAKE IT GENERAL for all resources
     def get_model_summery(self, resource_name):
-        print('model_summery: ')
+        print("model_summery: ")
         # print_cyne(pickle.loads(self.global_model[resource_name]))
 
     # what extra params
     def get_required_params(self):
-        print('get_required_params')
+        print("get_required_params")
 
     # check files are in the file system, OR wait
     def check_file_exist(self, file):
-        return True #TODO, debugings
+        return True  # TODO, debugings
         i = 0
         answer = False
         while True:
@@ -555,21 +635,31 @@ class Client:
 
         return answer
 
-    def load_client_dataset(self, training_data_splits_path, rsc_target, day_index, client_idx, no_training_samples):
+    def load_client_dataset(
+        self,
+        training_data_splits_path,
+        rsc_target,
+        day_index,
+        client_idx,
+        no_training_samples,
+    ):
         print_orange("Waiting for dataset files to be loaded")
 
-        training_data_dir_path = f'{training_data_splits_path}/{rsc_target}_{day_index}_{client_idx}'
+        training_data_dir_path = (
+            f"{training_data_splits_path}/{rsc_target}_{day_index}_{client_idx}"
+        )
         training_data = []
 
         # wait longer for file splitting at the start
         if day_index == 1:
-            time.sleep(WAIT_FOR_DS_SPLITS)  # Wait till the Splitter writes out the files to the file system
+            time.sleep(
+                WAIT_FOR_DS_SPLITS
+            )  # Wait till the Splitter writes out the files to the file system
 
         if self.check_file_exist(training_data_dir_path):
-            training_data, _ = load_database_file_split(training_data_dir_path,
-                                                        day_index,
-                                                        no_training_samples)
-
+            training_data, _ = load_database_file_split(
+                training_data_dir_path, day_index, no_training_samples
+            )
 
             self.segment_size = training_data.shape[0] / self.rounds
 
@@ -587,9 +677,9 @@ class Client:
     def get_data_analysis(self, resource_name, model, train_x, test_x, target=""):
         train_MSe, threshold = da.get_tarin_MSE_and_threshold(model, train_x, test_x)
 
-        #TODO
+        # TODO
         # change resource_name
-        print(f'Average MSE ({target} gnb): {np.mean(train_MSe)}')
+        print(f"Average MSE ({target} gnb): {np.mean(train_MSe)}")
 
         return train_MSe, threshold
 
@@ -599,15 +689,14 @@ class Client:
         self.ready_to_start(self.rsc_target)
 
     def produce_json_result(self, resource_name):
-        self.print[resource_name]('training_finished')
-
+        self.print[resource_name]("training_finished")
 
         print_cyne(f"Analysis for client[{str(self.client_id)}]:\n", self.full_analysis)
-        print_cyne(f"Analysis for client[{str(self.client_id)}]:\n", self.round_analysis)
+        print_cyne(
+            f"Analysis for client[{str(self.client_id)}]:\n", self.round_analysis
+        )
 
-
-
-        mode = self.running_mode['mode']
+        mode = self.running_mode["mode"]
         if mode.upper() == "batch".upper():
             segment_size = self.segment_size  # self.running_mode['batch_size']
         else:
@@ -616,28 +705,37 @@ class Client:
         training_settings = {
             "epochs": self.epochs,
             "mode": mode,
-            "Rounds": self.total_rounds
+            "Rounds": self.total_rounds,
         }
         w_t = get_formatted_elapsed_time(self.start_timestamp, True)
 
-        self.full_analysis[str(self.client_id)]["node_name"] = f"{os.uname()[1]}  {os.uname()[2]}"
+        self.full_analysis[str(self.client_id)]["node_name"] = (
+            f"{os.uname()[1]}  {os.uname()[2]}"
+        )
         self.full_analysis[str(self.client_id)]["resource_target"] = self.rsc_target
         self.full_analysis[str(self.client_id)]["training_settings"] = training_settings
-        self.full_analysis[str(self.client_id)]["model_info"] = {"model_type": self.model_type.lower(),
-                                                                 "model_size": f'{self.model_size:,} bytes'}
-        self.full_analysis[str(self.client_id)]["FL total_training_time"] = \
-            {"total": w_t,
-             "start time": time.strftime("%H:%M:%S", self.start_time),
-             "end time": time.strftime("%H:%M:%S", time.localtime())}
+        self.full_analysis[str(self.client_id)]["model_info"] = {
+            "model_type": self.model_type.lower(),
+            "model_size": f"{self.model_size:,} bytes",
+        }
+        self.full_analysis[str(self.client_id)]["FL total_training_time"] = {
+            "total": w_t,
+            "start time": time.strftime("%H:%M:%S", self.start_time),
+            "end time": time.strftime("%H:%M:%S", time.localtime()),
+        }
         self.full_analysis[str(self.client_id)][f"rounds_anl"] = self.round_analysis
 
         threshold = np.quantile(self.incremental_MSE, self.quantile)
-        self.full_analysis[str(self.client_id)][f"final_threshold_[{self.quantile}_quantile]"] = threshold
-        dir_path = do.create_dir(f"{self.analysis_data_dir_path}/{self.layer}", f"{self.rsc_target}{self.output_folder}")
+        self.full_analysis[str(self.client_id)][
+            f"final_threshold_[{self.quantile}_quantile]"
+        ] = threshold
+        dir_path = do.create_dir(
+            f"{self.analysis_data_dir_path}/{self.layer}",
+            f"{self.rsc_target}{self.output_folder}",
+        )
 
-        fullpath = os.path.join(dir_path, f'{str(self.client_id)}.json')
+        fullpath = os.path.join(dir_path, f"{str(self.client_id)}.json")
         do.save_json_to_file(self.full_analysis, fullpath)
-
 
         self.training_finished = True
 
@@ -650,41 +748,44 @@ class Client:
         print("-------------- Ready --------------")
 
     def do_training(self, db_splits_count, resource_name, init_model):
-        
+
         first_pass = True
         file_loaded_dic = {}
         g_model = init_model
         for day in range(1, db_splits_count + 1):
-
             print_purple(f"loading database files split [{day}]")
 
             t_fl = time.time()
             s_time = time.strftime("%H:%M:%S", time.localtime())
 
-
             is_file_loaded = True
 
             e_time = time.strftime("%H:%M:%S", time.localtime())
             time_fld = get_formatted_elapsed_time(t_fl)
-            file_loaded_dic[day] ={'real time data'}# {"split_index": day, "start_time": s_time, "end_time": e_time, "duration": time_fld}
-            
-            producer = Producer(self.data_pipeline_parameter, self.producer_sleep_time_interval)
-            consumer = OnlineConsumer(END_TO_END_TIME_THRESHOLD, self.epochs_before_aggregation)
+            file_loaded_dic[day] = {
+                "real time data"
+            }  # {"split_index": day, "start_time": s_time, "end_time": e_time, "duration": time_fld}
+
+            producer = Producer(
+                self.data_pipeline_parameter, self.producer_sleep_time_interval
+            )
+            consumer = OnlineConsumer(
+                END_TO_END_TIME_THRESHOLD, self.epochs_before_aggregation
+            )
             producer.start()
             consumer.start()
-            
+
             for round_ in range(self.rounds):
                 # print_blue("Get data from Data Pipeline System")
                 training_round_start = time.time()
                 local_model = g_model
                 epoch_ = 1
                 count_discarded_data = 0
-                deployment_state ={}
+                deployment_state = {}
                 training_time = 0
                 learning_time = 0
-                self.current_round = round_+1
-                while epoch_  <= self.epochs_before_aggregation:
-                    
+                self.current_round = round_ + 1
+                while epoch_ <= self.epochs_before_aggregation:
                     self.current_epochs_before_aggregation = epoch_
                     timed_training_data = consumer.get_training_data()
                     segment_training_data = timed_training_data.get("timed_training")
@@ -694,67 +795,81 @@ class Client:
                     preprocessing_time = timed_training_data.get("preprocessing_time")
                     end_to_end_time = timed_training_data.get("end_to_end_time")
                     if to_discard:
-                        
                         count_discarded_data = count_discarded_data + 1
-                        deployment_state["preprocessing_time"]=preprocessing_time
-                        deployment_state["end_to_end_time"]=end_to_end_time
-                        deployment_state["learning_time"]=learning_time
-                        deployment_state["training_time"]=training_time
-                        print_purple(f"Set discarded data for inter_round  [{epoch_}] where the end-to-end time is {end_to_end_time}")
-                        #epoch_ = epoch_ + 1
-        
+                        deployment_state["preprocessing_time"] = preprocessing_time
+                        deployment_state["end_to_end_time"] = end_to_end_time
+                        deployment_state["learning_time"] = learning_time
+                        deployment_state["training_time"] = training_time
+                        print_purple(
+                            f"Set discarded data for inter_round  [{epoch_}] where the end-to-end time is {end_to_end_time}"
+                        )
+                        # epoch_ = epoch_ + 1
+
                     training_epoch_start = time.time()
                     print(segment_training_data.shape)
 
                     if first_pass:
-                        csv_file_name = 'timestamp-values_'+str(self.rounds)+'.csv'
+                        csv_file_name = "timestamp-values_" + str(self.rounds) + ".csv"
                         utils.delete_csv_file(csv_file_name)
                         first_pass = False
-                        l_model = self.select_training_frmwrk(segment_training_data, resource_name,self.global_model[resource_name])
+                        l_model = self.select_training_frmwrk(
+                            segment_training_data,
+                            resource_name,
+                            self.global_model[resource_name],
+                        )
                     else:
-                        l_model = self.select_training_frmwrk(segment_training_data, resource_name, local_model)
+                        l_model = self.select_training_frmwrk(
+                            segment_training_data, resource_name, local_model
+                        )
 
                     local_model = l_model
                     training_epoch_end = time.time()
-                    if training_time > (training_epoch_end-training_epoch_start):
-                        training_time = training_epoch_end-training_epoch_start
-                    column_names.append('training_epoch_start')
-                    column_names.append('training_epoch_end')
-                    column_names.append('count_discarded_data')
+                    if training_time > (training_epoch_end - training_epoch_start):
+                        training_time = training_epoch_end - training_epoch_start
+                    column_names.append("training_epoch_start")
+                    column_names.append("training_epoch_end")
+                    column_names.append("count_discarded_data")
                     column_values.append(training_epoch_start)
                     column_values.append(training_epoch_end)
                     column_values.append(count_discarded_data)
-                    column_names.append('training_round_start')
-                    column_names.append('training_round_end')
+                    column_names.append("training_round_start")
+                    column_names.append("training_round_end")
                     column_values.append(training_round_start)
                     if epoch_ < self.epochs_before_aggregation:
-                        column_values.append('')
+                        column_values.append("")
                     else:
-                        learning_time = training_epoch_end-training_epoch_start
+                        learning_time = training_epoch_end - training_epoch_start
                         training_round_end = time.time()
                         column_values.append(training_round_end)
-                        deployment_state["preprocessing_time"]=preprocessing_time
-                        deployment_state["end_to_end_time"]=end_to_end_time
-                        deployment_state["learning_time"]=learning_time
-                        deployment_state["training_time"]=training_time
+                        deployment_state["preprocessing_time"] = preprocessing_time
+                        deployment_state["end_to_end_time"] = end_to_end_time
+                        deployment_state["learning_time"] = learning_time
+                        deployment_state["training_time"] = training_time
 
-                       
-                    column_names.append('local_model_size')
-                    column_names.append('global_model_size')
+                    column_names.append("local_model_size")
+                    column_names.append("global_model_size")
                     column_values.append(self.local_model_size)
                     column_values.append(self.global_model_size)
-                    csv_file_name = 'timestamp-values_'+str(self.rounds)+'.csv'
-                    utils.write_to_csv_file(csv_file_name,column_names,column_values)
-                    epoch_ =  epoch_ +1
+                    csv_file_name = "timestamp-values_" + str(self.rounds) + ".csv"
+                    utils.write_to_csv_file(csv_file_name, column_names, column_values)
+                    epoch_ = epoch_ + 1
                     count_discarded_data = 0
-                
-                g_model_ = self.transmit_local_model(resource_name=resource_name, local_model=local_model.get_weights())
-                #unpickle parameters and model
-                g_model = self.get_fl_global_model(resource_name=resource_name, model=g_model_)
-                
-                self.inter_round_data_analysis(segment_training_data, resource_name, g_model, file_loaded_dic)
-                learning_time = self.model_exchange_time + deployment_state.get("learning_time")
-                deployment_state["learning_time"]=learning_time
+
+                g_model_ = self.transmit_local_model(
+                    resource_name=resource_name, local_model=local_model.get_weights()
+                )
+                # unpickle parameters and model
+                g_model = self.get_fl_global_model(
+                    resource_name=resource_name, model=g_model_
+                )
+
+                self.inter_round_data_analysis(
+                    segment_training_data, resource_name, g_model, file_loaded_dic
+                )
+                learning_time = self.model_exchange_time + deployment_state.get(
+                    "learning_time"
+                )
+                deployment_state["learning_time"] = learning_time
                 self.publish_to_topic(deployment_state)
             file_loaded_dic = {}
 
@@ -763,28 +878,23 @@ class Client:
             producer.join()
             # Save training process outputs
         self.produce_json_result(resource_name)
-        
 
-    
-    
     def publish_to_topic(self, json_data):
-        
-        topic_name="deployment_state_topic"
+
+        topic_name = "deployment_state_topic"
         json_dumped = json.dumps(json_data)
-        producer = KafkaProducer(bootstrap_servers=self.data_pipeline_parameter.get("bootstrap_server"), api_version=(0, 10))
-        producer.send(topic_name, value=json_dumped.encode('utf-8'))   
-       
-    
+        producer = KafkaProducer(
+            bootstrap_servers=self.data_pipeline_parameter.get("bootstrap_server"),
+            api_version=(0, 10),
+        )
+        producer.send(topic_name, value=json_dumped.encode("utf-8"))
+
 
 from tensorflow.keras.callbacks import EarlyStopping
 
 
-
-
-
-    
 # def current_time():
-        
+
 #     wait_for_response = True
 #     retry = 0
 #     while wait_for_response:
@@ -800,22 +910,69 @@ from tensorflow.keras.callbacks import EarlyStopping
 #             wait_for_response = False
 #     return response.tx_timestamp
 
+
 # Patched to avoid ntp dependency issues outside CNAM network
 def current_time():
     return time.time()
-    
+
+
 def keras_lstm_training(X, y, epochs, model, batch_size=64, verbose=1):
     # fit model
 
     my_callbacks = [
-        EarlyStopping(monitor='loss', patience=4),
+        EarlyStopping(monitor="loss", patience=4),
     ]
-    model.fit(X, y, epochs=epochs,
-              batch_size=batch_size,
-              #     validation_split=0.1, # TODO: replace with a vildation data
-              verbose=verbose,
-              callbacks=my_callbacks,
-              shuffle=False)
+    return model.fit(
+        X,
+        y,
+        epochs=epochs,
+        batch_size=batch_size,
+        #     validation_split=0.1, # TODO: replace with a vildation data
+        verbose=verbose,
+        callbacks=my_callbacks,
+        shuffle=False,
+    )
+
+
+def keras_lstm_training_fedprox(
+    X, y, epochs, model, global_weights, mu, batch_size=64, verbose=0
+):
+    gw = [tf.constant(w, dtype=tf.float32) for w in global_weights]
+    original_loss = model.loss
+
+    def proximal_loss(y_true, y_pred):
+        # FedProx objective: reconstruction loss + (mu / 2) * ||w_local - w_global||^2.
+        base = tf.reduce_mean(tf.square(y_pred - y_true))
+        prox = tf.add_n(
+            [
+                tf.reduce_sum(tf.square(w - g))
+                for w, g in zip(model.trainable_weights, gw)
+            ]
+        )
+        return base + (mu / 2.0) * prox
+
+    model.compile(optimizer=model.optimizer, loss=proximal_loss)
+    history = model.fit(
+        X,
+        y,
+        epochs=epochs,
+        batch_size=batch_size,
+        verbose=verbose,
+        callbacks=[EarlyStopping(monitor="loss", patience=4)],
+        shuffle=False,
+    )
+    # Restore the original loss so future non-FedProx training is not affected.
+    model.compile(optimizer=model.optimizer, loss=original_loss)
+    return history
+
+
+def _append_loss_to_csv(round_loss, round_no, algorithm):
+    # Minimal loss log used to compare FedAvg and FedProx convergence over rounds.
+    utils.write_to_csv_file(
+        "training_loss.csv",
+        ["round", "algorithm", "loss"],
+        [round_no, algorithm, round_loss],
+    )
 
 
 def get_formatted_elapsed_time(t, dated=False):
@@ -824,26 +981,26 @@ def get_formatted_elapsed_time(t, dated=False):
         return f"{dt}"
     else:
         return time.strftime("%H:%M:%S", time.gmtime(time.time() - t))
-    
+
 
 def appends_to_json_file(data, filepath):
     # Ensure directory exists
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    
+
     # Load existing data if file exists, else start with empty list
     try:
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             existing_data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         existing_data = []
-    
+
     # Ensure existing_data is a list
     if not isinstance(existing_data, list):
         existing_data = [existing_data]
-    
+
     # Append new data
     existing_data.append(data)
-    
+
     # Save updated data back to file
-    with open(filepath, 'w') as f:
+    with open(filepath, "w") as f:
         json.dump(existing_data, f, indent=4)

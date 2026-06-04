@@ -6,13 +6,18 @@ import numpy as np
 import subprocess
 # import torch
 
-from tensor_pb2 import (Model, Empty,
-                        FunctionReturns,
-                        RegistrationResponse,
-                        TrainingModelAndInitializationParams)
+from tensor_pb2 import (
+    Model,
+    Empty,
+    FunctionReturns,
+    RegistrationResponse,
+    TrainingModelAndInitializationParams,
+)
 
-from tensor_pb2_grpc import (FederatedLearningServicer,
-                             add_FederatedLearningServicer_to_server)
+from tensor_pb2_grpc import (
+    FederatedLearningServicer,
+    add_FederatedLearningServicer_to_server,
+)
 
 import grpc
 import time
@@ -36,13 +41,13 @@ from Colors import print_colors as pcolors
 # as there a problem for pickling tf.keras, this is a work around
 # from Data_operations.tf_keras_pickel_solution import make_keras_picklable
 from Data_operations import DataAnalysis as da, dataOperations as do
-#from sympy.printing import str
+# from sympy.printing import str
 
 ROOT_DIR = os.getcwd()
 ROOT_DIR = ROOT_DIR.split("/")
-ROOT_DIR = ROOT_DIR[:len(ROOT_DIR) - 1]
+ROOT_DIR = ROOT_DIR[: len(ROOT_DIR) - 1]
 ROOT_DIR = "/".join(ROOT_DIR)
-sys.path.insert(0, f'{ROOT_DIR}/Utils')
+sys.path.insert(0, f"{ROOT_DIR}/Utils")
 import utils
 from pathlib import Path
 
@@ -62,13 +67,16 @@ MIN_FL_CLIENTS = 2
 MAX_PARTICIPANTS_ALLOWED = 2
 
 SECONDS_IN_A_DAY = 1 * 24 * 60 * 60  # (day * 24_hours * 60_minutes * 60_seconds)
-#SECONDS_IN_A_DAY = 5
+# SECONDS_IN_A_DAY = 5
 # TODO: SEE IF IT POSSIBEL TO LEAVE IT THERE
 # MAX_MESSAGE_LENGTH = 1024 * 1024 * 20
 MAX_MESSAGE_LENGTH = 1024 * 1024 * 390
 
-MAX_WAITING_TIME_FOR_CLIENT_CONTRIBUTION = 1000_1000  # LONG time so it can't be executed
-MAX_WAITING_TIME_FOR_CLIENT_CONTRIBUTION = 70 #This is in asynchronous method
+MAX_WAITING_TIME_FOR_CLIENT_CONTRIBUTION = (
+    1000_1000  # LONG time so it can't be executed
+)
+MAX_WAITING_TIME_FOR_CLIENT_CONTRIBUTION = 70  # This is in asynchronous method
+
 
 class ModelTypeStruct(enum.Enum):
     TORCh = 1
@@ -85,7 +93,7 @@ class RoundStruct:
         self.is_current_round = is_current
 
 
-class Participant():
+class Participant:
     def __init__(self, client_id, name, model_transmit_time=0):
         self.name = name
         self.id = client_id
@@ -107,22 +115,32 @@ class Participant():
         #     self.last_seen = val
 
 
-CPU = 'cpu'
-MEMORY = 'Memory'
-NETWORK = 'NW'
-DISK = 'Disk'
+CPU = "cpu"
+MEMORY = "Memory"
+NETWORK = "NW"
+DISK = "Disk"
 
 
 class FLServer(FederatedLearningServicer):
-    def __init__(self, train_data, test_data, client_count=0,
-                 trained_model_folder="", rsc_target="unknown", layer="unknown"):
+    def __init__(
+        self,
+        train_data,
+        test_data,
+        client_count=0,
+        trained_model_folder="",
+        rsc_target="unknown",
+        layer="unknown",
+    ):
         self.layer = layer
         self.train_data = train_data
         self.test_data = test_data
         self.model_type = None
         self.fraction = None
         self.total_rounds = None
-        self.aggregation_method=None
+        self.aggregation_method = None
+        # FedProx is selected separately from sync/async aggregation mode.
+        self.fl_algorithm = "fedavg"
+        self.fedprox_mu = 0.01
         self.local_epochs = None
         self.batch_size = None
         self.lr = None
@@ -135,7 +153,7 @@ class FLServer(FederatedLearningServicer):
 
     def __del__(self):
         # self.heartbeat_thread.stop()
-        print('tic monitoring stopped')
+        print("tic monitoring stopped")
 
     def init(self):
 
@@ -151,20 +169,16 @@ class FLServer(FederatedLearningServicer):
         # self.global_model = LSTM_ML_model.LSTMAutoencoder(10, 1)
         # self.serialized_global_model = pickle.dumps(self.global_model)
 
-        self.current_round = {CPU: 0,
-                              MEMORY: 0,
-                              NETWORK: 0,
-                              DISK: 0}
+        self.current_round = {CPU: 0, MEMORY: 0, NETWORK: 0, DISK: 0}
 
-        self.current_parmQ = {CPU: Queue(),
-                              MEMORY: Queue(),
-                              NETWORK: Queue(),
-                              DISK: Queue()}
+        self.current_parmQ = {
+            CPU: Queue(),
+            MEMORY: Queue(),
+            NETWORK: Queue(),
+            DISK: Queue(),
+        }
 
-        self.current_clients = {CPU: {},
-                                MEMORY: {},
-                                NETWORK: {},
-                                DISK: {}}
+        self.current_clients = {CPU: {}, MEMORY: {}, NETWORK: {}, DISK: {}}
         self.chunk_count = 1
 
         # mdl = pickle.dumps(LSTM_ML_model.LSTMAutoencoder)
@@ -177,25 +191,13 @@ class FLServer(FederatedLearningServicer):
 
         # NOTICE: The values set to true so the
         # aggregation not start when the server first run
-        self.training_end = {CPU: False,
-                             MEMORY: False,
-                             NETWORK: False,
-                             DISK: False}
+        self.training_end = {CPU: False, MEMORY: False, NETWORK: False, DISK: False}
 
-        self.resource_train_time = {CPU: 0,
-                                    MEMORY: 0,
-                                    NETWORK: 0,
-                                    DISK: 0}
+        self.resource_train_time = {CPU: 0, MEMORY: 0, NETWORK: 0, DISK: 0}
 
-        self.client_with_local_model = {CPU: {},
-                                        MEMORY: {},
-                                        NETWORK: {},
-                                        DISK: {}}
+        self.client_with_local_model = {CPU: {}, MEMORY: {}, NETWORK: {}, DISK: {}}
 
-        self.client_with_local_model_copy = {CPU: {},
-                                             MEMORY: {},
-                                             NETWORK: {},
-                                             DISK: {}}
+        self.client_with_local_model_copy = {CPU: {}, MEMORY: {}, NETWORK: {}, DISK: {}}
         self.ready_clients = 0
         self.aggregation_started = False
         self.last_seen = time.time() + SECONDS_IN_A_DAY
@@ -209,60 +211,81 @@ class FLServer(FederatedLearningServicer):
         self.do_wait = SECONDS_IN_A_DAY
         self.check_trying = True
 
-        tformated = f'{str(self.MAX_ACCEPTED_CLIENTS_FOR_TRAINING).zfill(3)}_%H%M%S_%d%m%y'
-        self.folder_string = f'{time.strftime(tformated, time.localtime())}'
-        
+        tformated = (
+            f"{str(self.MAX_ACCEPTED_CLIENTS_FOR_TRAINING).zfill(3)}_%H%M%S_%d%m%y"
+        )
+        self.folder_string = f"{time.strftime(tformated, time.localtime())}"
+
         self.client_to_send_global_model = {}
-    
-    def set_client_to_send_global_model(self,client_to_send_global_model):
+
+    def set_client_to_send_global_model(self, client_to_send_global_model):
         self.client_to_send_global_model = client_to_send_global_model
-      
+
     # region CALLABLE FOR GENERAL USE
     def set_ML_model_class(self, model):
         self.global_model = model
         # self.model_type = str(type(model)).replace("<class '", "").split(".")[0]
         self.model_code = pickle.dumps(model)
-        print(f'Global model size [{sys.getsizeof(self.model_code):,}]]')
+        print(f"Global model size [{sys.getsizeof(self.model_code):,}]]")
 
     def set_training_function(self, training_function):
         self.training_function = pickle.dumps(training_function)
 
-    def init_parameters(self, total_rounds,aggregation_method, data_splits_count, local_epochs, batch_size=24, learning_rate=0.003,
-                        sampling_fraction=1,
-                        optimizer='ADAM'):
+    def init_parameters(
+        self,
+        total_rounds,
+        aggregation_method,
+        data_splits_count,
+        local_epochs,
+        batch_size=24,
+        learning_rate=0.003,
+        sampling_fraction=1,
+        optimizer="ADAM",
+        fl_algorithm="fedavg",
+        fedprox_mu=0.01,
+    ):
         self.fraction = sampling_fraction
 
         # TODO [remember], as dataset is very large, is split into a number (14) files
         # the number of rounds should span all these files
-        self.total_rounds = total_rounds * data_splits_count  # this will also be passed by clients.. TODO solve later
-        self.aggregation_method=aggregation_method
+        self.total_rounds = (
+            total_rounds * data_splits_count
+        )  # this will also be passed by clients.. TODO solve later
+        self.aggregation_method = aggregation_method
 
         self.local_epochs = local_epochs
         self.batch_size = batch_size
         self.lr = learning_rate
         self.optimizer = optimizer
+        self.fl_algorithm = fl_algorithm.lower()
+        self.fedprox_mu = fedprox_mu
 
-    def run_server(self, url='[::]', port='50055', max_workers=10):
+    def run_server(self, url="[::]", port="50055", max_workers=10):
         if self.global_model is None or self.training_function is None:
-            raise ValueError("Either or both ML model and training method are not provided")
+            raise ValueError(
+                "Either or both ML model and training method are not provided"
+            )
         elif self.total_rounds is None or self.local_epochs is None:
-            raise ValueError("Either or both total rounds and local epochs are not provided")
+            raise ValueError(
+                "Either or both total rounds and local epochs are not provided"
+            )
         elif self.model_type is None or self.model_type not in ModelTypeStruct:
             raise NotImplementedError("Model type is required, e.g. torch, Keras")
         else:
-
             print("run     ", self.local_epochs)
             # TODO: TRY TO FIX IT
             # ck_thread = threading.Thread(target=self.check_client_existence, args=(0,)).start()
-            ag_thread = threading.Thread(target=self.aggregate_local_models_cpu, ).start()
+            ag_thread = threading.Thread(
+                target=self.aggregate_local_models_cpu,
+            ).start()
 
             serve(self, url, port, max_workers)
 
     # endregion
     def get_MSE(self, model, train_data):
         train_predicted = model.predict(train_data)
-        train_flat_x = (do.flatten(train_data))
-        pred_train_flat_x = (do.flatten(train_predicted))
+        train_flat_x = do.flatten(train_data)
+        pred_train_flat_x = do.flatten(train_predicted)
         train_squared_error = np.square(train_flat_x - pred_train_flat_x)  # power
         train_MSE_loss = np.mean(train_squared_error, axis=1)
 
@@ -271,7 +294,15 @@ class FLServer(FederatedLearningServicer):
     def send_aggregated_model(self, resource_name, s_model, client_count):
         # time.sleep(random.uniform(0.1, 0.3))
         model_size = sys.getsizeof(s_model)
-        print(f'Send global model:  [{model_size:,}] bytes')
+        print(f"Send global model:  [{model_size:,}] bytes")
+        # Send algorithm metadata with the weights so every client uses the same objective.
+        payload = pickle.dumps(
+            {
+                "weights": pickle.loads(s_model),
+                "algorithm": self.fl_algorithm,
+                "fedprox_mu": self.fedprox_mu,
+            }
+        )
 
         # get The MSR
         # mse = self.get_MSE(self.global_model, self.train_data)
@@ -279,29 +310,35 @@ class FLServer(FederatedLearningServicer):
         # print(f'MSE: {mse}')
         # print(f'average mean: {np.mean(mse)}')
         # print("=" * 80)
-        
+
         if (self.current_round[resource_name] + 1) < self.total_rounds:
-            
             self.current_round[resource_name] += 1
-            
+
         else:
-            
-            if self.counter == self.MAX_ACCEPTED_CLIENTS_FOR_TRAINING * self.total_rounds:
+            if (
+                self.counter
+                == self.MAX_ACCEPTED_CLIENTS_FOR_TRAINING * self.total_rounds
+            ):
                 self.current_round[resource_name] += 1
-            
-        
+
         self.check_trying = True
 
         for i in range(client_count):
-            self.current_parmQ[resource_name].put(s_model)
+            self.current_parmQ[resource_name].put(payload)
             # print(f'\tNOTICE: chunk no: = {i} ')
 
-    def set_clients_local_models(self, resource_name, client_id, l_model, model_transmit_time):
+    def set_clients_local_models(
+        self, resource_name, client_id, l_model, model_transmit_time
+    ):
         # print(resource_name, client_id, sys.getsizeof(l_model), model_transmit_time)
         model = pickle.loads(l_model)
         self.current_clients[resource_name][client_id].model = model
-        self.current_clients[resource_name][client_id].model_transmit_time = model_transmit_time
-        self.client_with_local_model[resource_name][client_id] = self.current_clients[resource_name][client_id]
+        self.current_clients[resource_name][
+            client_id
+        ].model_transmit_time = model_transmit_time
+        self.client_with_local_model[resource_name][client_id] = self.current_clients[
+            resource_name
+        ][client_id]
         self.last_seen = time.time()
 
     # not used
@@ -312,32 +349,45 @@ class FLServer(FederatedLearningServicer):
             if self.total_rounds > self.current_round:
                 client_count = len(self.client_with_local_model)
                 # time.sleep(ROUND_WAITING_TIME)
-                if client_count >= self.MAX_ACCEPTED_CLIENTS_FOR_TRAINING:  # or self.time_is_up():
+                if (
+                    client_count >= self.MAX_ACCEPTED_CLIENTS_FOR_TRAINING
+                ):  # or self.time_is_up():
                     print("aggregate local")
                     if client_count > 0:
                         t_start = time.time()
-                        if self.current_round == 0:  # log time for first round to signal start of training
-                            cut_time = time.strftime('%H:%M:%S %d/%m/%Y')
+                        if (
+                            self.current_round == 0
+                        ):  # log time for first round to signal start of training
+                            cut_time = time.strftime("%H:%M:%S %d/%m/%Y")
                             # print(pColors.OKORANGE, f'Start time {cut_time}')
-                            pcolors.print_orange(f'Start time {cut_time}')
+                            pcolors.print_orange(f"Start time {cut_time}")
                             self.training_start_time = t_start
 
                         self.client_with_local_model_copy[resource_name] = copy.copy(
-                            self.client_with_local_model[
-                                resource_name])  # work round to use it later to count the cliet
+                            self.client_with_local_model[resource_name]
+                        )  # work round to use it later to count the cliet
                         self.client_with_local_model[resource_name].clear()
-                        self.last_seen = time.time() + SECONDS_IN_A_DAY  # work for setting the time
+                        self.last_seen = (
+                            time.time() + SECONDS_IN_A_DAY
+                        )  # work for setting the time
 
-                        sampled_clients = self.sample_participants(resource_name, client_count, fraction=self.fraction)
+                        sampled_clients = self.sample_participants(
+                            resource_name, client_count, fraction=self.fraction
+                        )
 
-                        self.average_fd_model_to_num_of_clients(sampled_clients, resource_name)
-                        self.send_aggregated_model(resource_name, pickle.dumps(self.global_model), client_count)
+                        self.average_fd_model_to_num_of_clients(
+                            sampled_clients, resource_name
+                        )
+                        self.send_aggregated_model(
+                            resource_name, pickle.dumps(self.global_model), client_count
+                        )
 
                         t_end = time.time()
                         total_time = t_end - t_start
 
-                        pcolors.print_orange(f'{client_count} participants were averaged in {total_time} seconds')
-
+                        pcolors.print_orange(
+                            f"{client_count} participants were averaged in {total_time} seconds"
+                        )
 
                     else:
                         print("STRANGEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
@@ -355,20 +405,24 @@ class FLServer(FederatedLearningServicer):
                 model_size = sys.getsizeof(self.global_model)
                 t_end = time.time()
                 total_time = t_end - self.training_start_time
-                cut_time = time.strftime('%H:%M:%S %d/%m/%Y')
-                pcolors.print_orange(f'End time {cut_time}')
+                cut_time = time.strftime("%H:%M:%S %d/%m/%Y")
+                pcolors.print_orange(f"End time {cut_time}")
                 pcolors.print_orange(
-                    f'Average of {client_count} participants model parameters were averaged in {total_time} seconds')
+                    f"Average of {client_count} participants model parameters were averaged in {total_time} seconds"
+                )
 
                 pcolors.print_cyne(
-                    f' {get_time_format(self.get_average_model_transmission_time(self.client_with_local_model_copy))}')
+                    f" {get_time_format(self.get_average_model_transmission_time(self.client_with_local_model_copy))}"
+                )
 
                 # Save model to a file
-                file_name = 'model_cpu_trained.h5'
-                self.global_model.save(f'C:/Users/Salah/My notebooks/AD_DATA/Trained_models/{file_name}')
+                file_name = "model_cpu_trained.h5"
+                self.global_model.save(
+                    f"C:/Users/Salah/My notebooks/AD_DATA/Trained_models/{file_name}"
+                )
 
     def aggregate_local_models(self, resource_name):  # independent thread to
-       
+
         if self.start_aggregation is None:
             self.start_aggregation = time.time()
         if self.total_rounds > self.current_round[resource_name]:
@@ -380,69 +434,103 @@ class FLServer(FederatedLearningServicer):
                 self.check_trying = False
                 print("\t\tcheck_trying", self.check_trying)
 
-            force_aggregation = client_count >= self.MAX_ACCEPTED_CLIENTS_FOR_TRAINING and not self.check_trying
+            force_aggregation = (
+                client_count >= self.MAX_ACCEPTED_CLIENTS_FOR_TRAINING
+                and not self.check_trying
+            )
 
-            if self.aggregation_method=="async":
-            
-                force_aggregation = client_count > 1 and (time.time() - self.do_wait) >= MAX_WAITING_TIME_FOR_CLIENT_CONTRIBUTION \
-                                    and not self.check_trying
-    
-            
-            #if client_count >= self.MAX_ACCEPTED_CLIENTS_FOR_TRAINING or force_aggregation:
-                      
+            if self.aggregation_method == "async":
+                force_aggregation = (
+                    client_count > 1
+                    and (time.time() - self.do_wait)
+                    >= MAX_WAITING_TIME_FOR_CLIENT_CONTRIBUTION
+                    and not self.check_trying
+                )
+
+            # if client_count >= self.MAX_ACCEPTED_CLIENTS_FOR_TRAINING or force_aggregation:
+
             if force_aggregation:  # or self.time_is_up():
-
-                #print(resource_name, ' in aggr')
+                # print(resource_name, ' in aggr')
                 if client_count > 0:
                     t_start = time.time()
 
-                    if self.current_round == 0:  # log time for first round to signal start of training
-                        cut_time = time.strftime('%H:%M:%S %d/%m/%Y')
-                        pcolors.print_orange(f'[{resource_name}] Start time {cut_time}')
+                    if (
+                        self.current_round == 0
+                    ):  # log time for first round to signal start of training
+                        cut_time = time.strftime("%H:%M:%S %d/%m/%Y")
+                        pcolors.print_orange(f"[{resource_name}] Start time {cut_time}")
                         self.training_start_time = time.time()  # t_start
 
                         self.resource_train_time[resource_name] = t_start
 
                     self.client_with_local_model_copy[resource_name] = copy.copy(
-                        self.client_with_local_model[resource_name])  # work round to use it later to count the cliet
+                        self.client_with_local_model[resource_name]
+                    )  # work round to use it later to count the cliet
                     self.client_with_local_model[resource_name].clear()
-                    self.last_seen = time.time() + SECONDS_IN_A_DAY  # work a round for setting the time
+                    self.last_seen = (
+                        time.time() + SECONDS_IN_A_DAY
+                    )  # work a round for setting the time
 
-                    sampled_clients = self.sample_participants(resource_name, client_count, fraction=self.fraction)
+                    sampled_clients = self.sample_participants(
+                        resource_name, client_count, fraction=self.fraction
+                    )
 
-                    model_weights = self.average_fd_model_to_num_of_clients(sampled_clients, resource_name)
+                    model_weights = self.average_fd_model_to_num_of_clients(
+                        sampled_clients, resource_name
+                    )
                     self.current_global_model = model_weights
                     # print("<|>" * 40)
                     # print(self.current_global_model[0][:5, 4:8])
                     # print("<->" * 80)
                     # self.send_aggregated_model(resource_name, pickle.dumps(self.global_model), client_count)
-                    self.send_aggregated_model(resource_name, pickle.dumps(model_weights), client_count)
-                    column_names=['current_round','start_aggregation', 'end_aggregation', 'participant count', 'actual partipants']
-                    column_values=[str(self.current_round[resource_name]),str(self.start_aggregation),str(time.time()), str(client_count), str(sampled_clients)]
-                    utils.write_to_csv_file("aggregation_"+str(self.total_rounds)+".csv", column_names,column_values)
+                    self.send_aggregated_model(
+                        resource_name, pickle.dumps(model_weights), client_count
+                    )
+                    column_names = [
+                        "current_round",
+                        "start_aggregation",
+                        "end_aggregation",
+                        "participant count",
+                        "actual partipants",
+                    ]
+                    column_values = [
+                        str(self.current_round[resource_name]),
+                        str(self.start_aggregation),
+                        str(time.time()),
+                        str(client_count),
+                        str(sampled_clients),
+                    ]
+                    utils.write_to_csv_file(
+                        "aggregation_" + str(self.total_rounds) + ".csv",
+                        column_names,
+                        column_values,
+                    )
                     self.save_trained_model(self.current_round[resource_name])
                     self.start_aggregation = None
-                    
-                    
+
                 else:
                     print("-" * 80)
         else:
-
             model_size = sys.getsizeof(self.global_model)
             t_end = time.time()
             resource_total_time = t_end - self.resource_train_time[resource_name]
-            cut_time = time.strftime('%H:%M:%S %d/%m/%Y')
-            pcolors.print_orange(f'{resource_name} end time {cut_time}')
+            cut_time = time.strftime("%H:%M:%S %d/%m/%Y")
+            pcolors.print_orange(f"{resource_name} end time {cut_time}")
             t_t = time.time() - self.training_start_time
             t_t = time.strftime("%H:%M:%S", time.gmtime(t_t))
-            
-            column_names=['current_round','start_aggregation', 'end_aggregation']
-            data=[str(self.current_round[resource_name]),str(self.start_aggregation),str(time.time())]
-            utils.write_to_csv_file("aggregation_"+str(self.total_rounds)+".csv", column_names,data)
+
+            column_names = ["current_round", "start_aggregation", "end_aggregation"]
+            data = [
+                str(self.current_round[resource_name]),
+                str(self.start_aggregation),
+                str(time.time()),
+            ]
+            utils.write_to_csv_file(
+                "aggregation_" + str(self.total_rounds) + ".csv", column_names, data
+            )
             self.start_aggregation = None
-            print(f'Total training time: {t_t}')
+            print(f"Total training time: {t_t}")
             print("=" * 80)
-            
 
             # train_MSe, \
             # test_MSE_loss, \
@@ -451,17 +539,14 @@ class FLServer(FederatedLearningServicer):
             # threshold = self.get_data_analysis(resource_name, self.global_model, self.train_data,
             #                                    self.test_data)
 
-            
-                
-
             # print("<||>" * 40)
             # print(self.current_global_model[0][:5, 4:8])
             # print("<|-|>" * 40)
-            #TODO: NOTICE the self.global_model
-            
-            #self.global_model = self.current_global_model
+            # TODO: NOTICE the self.global_model
+
+            # self.global_model = self.current_global_model
             self.save_trained_model(self.current_round[resource_name])
-            
+
             print("=" * 80)
 
             # TODO: use later
@@ -476,71 +561,82 @@ class FLServer(FederatedLearningServicer):
             peep()  # MAKE SOUND
 
             self.training_end[resource_name] = True
-            
-            
+
             # self.init()
-    
+
     def save_trained_model(self, current_round):
-        
-        
+
         self.global_model.set_weights(self.current_global_model)
         pcolors.print_orange("\tsaving trained model")
-        file_name = f'{self.rsc_target}_{self.folder_string}_{current_round}.h5'
-        fldr = f'{self.trained_model_folder}/{self.layer}'
+        file_name = f"{self.rsc_target}_{self.folder_string}_{current_round}.h5"
+        fldr = f"{self.trained_model_folder}/{self.layer}"
         fldr_path = Path(fldr)
         print(fldr)
         print(fldr_path)
         if not fldr_path.exists():
             # fldr.mkdir(parents=True)
             fldr_path.mkdir(parents=True)
-        self.global_model.save(Path(f'{fldr}/{file_name}'))
+        self.global_model.save(Path(f"{fldr}/{file_name}"))
         # os.chmod(f'{fldr}/{file_name}', stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-        file = f'{fldr}/{file_name}'
-        pcolors.print_orange(f'{file_name} saved successfully at location: {fldr}')
+        file = f"{fldr}/{file_name}"
+        pcolors.print_orange(f"{file_name} saved successfully at location: {fldr}")
         for key in self.client_to_send_global_model:
             destination = self.client_to_send_global_model.get(key)
             p = subprocess.Popen(["scp", file, destination])
             sts = os.waitpid(p.pid, 0)
-            pcolors.print_orange(f'\tsend file to {destination}, statistics: {sts}')
-   
-            
-        
+            pcolors.print_orange(f"\tsend file to {destination}, statistics: {sts}")
+
     def get_data_analysis(self, resource_name, model, train_x, test_x, target=""):
-        test_MSE_loss, \
-            train_anomalous_data, \
-            test_anomalous_data, \
-            threshold, \
-            train_MSe = da.do_it(model, train_x, test_x)
+        (
+            test_MSE_loss,
+            train_anomalous_data,
+            test_anomalous_data,
+            threshold,
+            train_MSe,
+        ) = da.do_it(model, train_x, test_x)
 
-        print(f'Average MSE ({target} {resource_name}): {np.mean(train_MSe)}')
+        print(f"Average MSE ({target} {resource_name}): {np.mean(train_MSe)}")
         print(
-            f'Number of anomaly samples ({target} {resource_name}) :{np.sum(test_anomalous_data)} out of {len(test_anomalous_data)}')
-        print(f'Indices of anomaly samples ({target} {resource_name}): {np.where(test_anomalous_data)}')
+            f"Number of anomaly samples ({target} {resource_name}) :{np.sum(test_anomalous_data)} out of {len(test_anomalous_data)}"
+        )
+        print(
+            f"Indices of anomaly samples ({target} {resource_name}): {np.where(test_anomalous_data)}"
+        )
 
-        return train_MSe, test_MSE_loss, train_anomalous_data, test_anomalous_data, threshold
+        return (
+            train_MSe,
+            test_MSE_loss,
+            train_anomalous_data,
+            test_anomalous_data,
+            threshold,
+        )
 
     def send_global_model(self, resource_name):
         # Work round to make it wait and don't return immediately
         # logging.debug('in send model ', self.current_parmQ.qsize())
         if len(self.client_with_local_model_copy[resource_name]) == 0:
             parms = self.current_parmQ[resource_name].get()
-            print('\n-----------------send_global_model-----[None]---------')
+            print("\n-----------------send_global_model-----[None]---------")
 
             if self.total_rounds > self.current_round[resource_name]:
                 print("FL training completed")
 
-            return Model(parameters=parms,
-                         round=self.current_round[resource_name],
-                         resource_name=resource_name,
-                         trainingDone=self.total_rounds > self.current_round[resource_name])
+            return Model(
+                parameters=parms,
+                round=self.current_round[resource_name],
+                resource_name=resource_name,
+                trainingDone=self.total_rounds > self.current_round[resource_name],
+            )
 
         for x in range(len(self.client_with_local_model_copy)):
             parms = self.current_parmQ[resource_name].get()
-            print('\n-----------------send_global_model-----------------')
-            return Model(parameters=parms,
-                         round=self.current_round[resource_name],
-                         resource_name=resource_name,
-                         trainingDone=self.total_rounds > self.current_round[resource_name])
+            print("\n-----------------send_global_model-----------------")
+            return Model(
+                parameters=parms,
+                round=self.current_round[resource_name],
+                resource_name=resource_name,
+                trainingDone=self.total_rounds > self.current_round[resource_name],
+            )
 
     def get_average_model_transmission_time(self, participants):
         time_sum = 0
@@ -548,8 +644,12 @@ class FLServer(FederatedLearningServicer):
         if participants_count > 0:
             for client in participants:
                 print(self.client_with_local_model_copy[client].model_transmit_time)
-                time_sum += self.client_with_local_model_copy[client].model_transmit_time
-            print(f'{time_sum} / {participants_count} = {time_sum / participants_count}')
+                time_sum += self.client_with_local_model_copy[
+                    client
+                ].model_transmit_time
+            print(
+                f"{time_sum} / {participants_count} = {time_sum / participants_count}"
+            )
             return time_sum / participants_count
         else:
             return -1
@@ -562,7 +662,7 @@ class FLServer(FederatedLearningServicer):
         averaged_weights = OrderedDict()
         for it, idx in enumerate(sampled_client_indices):
             local_weights = self.current_clients[idx].model.state_dict()
-            print('\t', local_weights)
+            print("\t", local_weights)
             for key in self.global_model.state_dict().keys():
                 if it == 0:
                     averaged_weights[key] = coefficients[it] * local_weights[key]
@@ -571,13 +671,15 @@ class FLServer(FederatedLearningServicer):
             self.global_model.load_state_dict(averaged_weights)
 
         message = f"[Round: {self.current_round}] ...updated weights of {len(sampled_client_indices)} clients are successfully averaged!"
-        message = '\n\nDone'
+        message = "\n\nDone"
         # print(message)
 
-    def average_fd_model_to_num_of_clients(self, sampled_client_dic_keys, resource_name):
-        if self.model_type.name.lower() == 'torch':
+    def average_fd_model_to_num_of_clients(
+        self, sampled_client_dic_keys, resource_name
+    ):
+        if self.model_type.name.lower() == "torch":
             return self.average_torch_models(sampled_client_dic_keys, resource_name)
-        elif self.model_type.name.lower() == 'keras':
+        elif self.model_type.name.lower() == "keras":
             return self.average_keras_models(sampled_client_dic_keys, resource_name)
 
     def average_torch_models(self, sampled_client_keys, resource_name):
@@ -607,10 +709,12 @@ class FLServer(FederatedLearningServicer):
 
         self.global_model.load_state_dict(averaged_weights)
 
-        message = f"[Round: {self.current_round}] ...updated weights of {len(self.client_with_local_model_copy)} clients are " \
-                  f"successfully averaged! "
+        message = (
+            f"[Round: {self.current_round}] ...updated weights of {len(self.client_with_local_model_copy)} clients are "
+            f"successfully averaged! "
+        )
         # message = '\n\nDone'
-        print(message);
+        print(message)
 
     def average_keras_models(self, sampled_client_keys, resource_name):
         local_params = []
@@ -632,12 +736,16 @@ class FLServer(FederatedLearningServicer):
 
         # sample clients randomly
         message = f"[Round: {self.current_round}] Select clients...!"
-        print(message);
+        print(message)
         client_count = len(self.current_clients)
         num_sampled_clients = max(int(self.fraction * client_count), 1)
-        sampled_client_indices = sorted(np.random.choice(
-            a=[i for i in range(client_count)],
-            size=num_sampled_clients, replace=False).tolist())
+        sampled_client_indices = sorted(
+            np.random.choice(
+                a=[i for i in range(client_count)],
+                size=num_sampled_clients,
+                replace=False,
+            ).tolist()
+        )
 
         return sampled_client_indices
 
@@ -645,12 +753,17 @@ class FLServer(FederatedLearningServicer):
         if num_client > 0:
             num_sampled_clients = max(int(fraction * num_client), 1)
             # print('sample_participants ', f'{num_sampled_clients} = max(int({fraction} * {num_client}), 1)')
-            return sorted(random.sample(list(self.client_with_local_model_copy[resource_name]), k=num_sampled_clients))
+            return sorted(
+                random.sample(
+                    list(self.client_with_local_model_copy[resource_name]),
+                    k=num_sampled_clients,
+                )
+            )
         return []
 
     def received_messages(self, request):
         self.counter += 1
-        print(f'Get local model counter= {self.counter}')
+        print(f"Get local model counter= {self.counter}")
 
         def get_client_data():
             t_start = request.act_time
@@ -661,10 +774,9 @@ class FLServer(FederatedLearningServicer):
             l_model = request.parameters
             client_id = request.client.clientId
             resource_name = request.resource_name
-            self.set_clients_local_models(resource_name,
-                                          client_id,
-                                          l_model,
-                                          model_transmit_time)
+            self.set_clients_local_models(
+                resource_name, client_id, l_model, model_transmit_time
+            )
 
             # self.training_end[resource_name] = False
 
@@ -677,16 +789,16 @@ class FLServer(FederatedLearningServicer):
             self.aggregate_local_models(CPU)
 
     def aggregate_local_models_memory(self):
-        while not self.training_end['Memory']:
-            self.aggregate_local_models('Memory')
+        while not self.training_end["Memory"]:
+            self.aggregate_local_models("Memory")
 
     def aggregate_local_models_nw(self):
-        while not self.training_end['NW']:
-            self.aggregate_local_models('NW')
+        while not self.training_end["NW"]:
+            self.aggregate_local_models("NW")
 
     def aggregate_local_models_disk(self):
-        while not self.training_end['Disk']:
-            self.aggregate_local_models('Disk')
+        while not self.training_end["Disk"]:
+            self.aggregate_local_models("Disk")
 
     def TheMessageCPU(self, request, context):
         # print('Entry point')
@@ -697,23 +809,23 @@ class FLServer(FederatedLearningServicer):
 
     def TheMessageMemory(self, request, context):
         self.received_messages(request)
-        return self.send_global_model('Memory')
+        return self.send_global_model("Memory")
 
     def TheMessageNW(self, request, context):
         self.received_messages(request)
-        return self.send_global_model('NW')
+        return self.send_global_model("NW")
 
     def TheMessageDisk(self, request, context):
         self.received_messages(request)
-        return self.send_global_model('Disk')
+        return self.send_global_model("Disk")
 
     def LocalModel(self, request, context):
         self.counter += 1
-        print(f'[4] Get local model counter= {self.counter}')
+        print(f"[4] Get local model counter= {self.counter}")
 
         def get_client_data():
             t_start = request.act_time
-            print(f'act_time = {t_start}')
+            print(f"act_time = {t_start}")
             t_end = time.time()
             model_transmit_time = t_end - t_start
 
@@ -721,7 +833,7 @@ class FLServer(FederatedLearningServicer):
             client_id = request.client.clientId
             self.set_clients_local_models(client_id, l_model, model_transmit_time)
 
-            print(f'{self.current_round} {self.total_rounds}')
+            print(f"{self.current_round} {self.total_rounds}")
 
         threading.Thread(target=get_client_data).start()
 
@@ -730,9 +842,11 @@ class FLServer(FederatedLearningServicer):
     # NOT USED ANY MORE
     def GlobalModel(self, request, context):
         idx = 0
-        print(f'[3] Send global model[{2}]  [{idx}]')
+        print(f"[3] Send global model[{2}]  [{idx}]")
         parms = self.current_parmQ.get()
-        response = Model(parameters=parms, round=self.current_round, modelChunkCount=self.chunk_count)
+        response = Model(
+            parameters=parms, round=self.current_round, modelChunkCount=self.chunk_count
+        )
         # response = Model(parameters=self.current_parm[idx], round=self.current_round, modelChunkCount=self.chunk_count)
 
         return response
@@ -770,8 +884,11 @@ class FLServer(FederatedLearningServicer):
         if client_id not in self.current_clients:
             self.current_clients[resource_name][client_id] = participant
             self.COUNT_REGISTERED_CLIENTS += 1
-            print(cc.Blue, f'{self.COUNT_REGISTERED_CLIENTS} {client_name} [{client_id}] registered successfully ',
-                  cc.Color_Off)
+            print(
+                cc.Blue,
+                f"{self.COUNT_REGISTERED_CLIENTS} {client_name} [{client_id}] registered successfully ",
+                cc.Color_Off,
+            )
             client_registered = True
         # print(f'Participants: {MAX_ACCEPTED_CLIENTS_FOR_TRAINING}')
         return RegistrationResponse(registered=client_registered)
@@ -792,21 +909,27 @@ class FLServer(FederatedLearningServicer):
         return model
 
     def TransmitInitializationParams(self, request, context):
-        print("Request for GL model and init parameters submitted by ", request.clientId)
+        print(
+            "Request for GL model and init parameters submitted by ", request.clientId
+        )
 
         t = time.time()
-        pickled_glm = self.get_model_json_and_weights(self.global_model)  # pickle.dumps(self.global_model)
-        print(f'Object serialized in {time.time() - t} sec')
-        tmf = TrainingModelAndInitializationParams(nnModel=self.model_code,
-                                                   modelType=self.model_type.name,
-                                                   trainingFunc=self.training_function,
-                                                   initialModel=pickle.dumps(pickled_glm),
-                                                   epochs=self.local_epochs,
-                                                   batchSize=self.batch_size,
-                                                   rounds=self.total_rounds,
-                                                   lr=self.lr,
-                                                   folder_string=f'_{self.folder_string}')
-        print('Training model and function are placed in client ', request.clientId)
+        pickled_glm = self.get_model_json_and_weights(
+            self.global_model
+        )  # pickle.dumps(self.global_model)
+        print(f"Object serialized in {time.time() - t} sec")
+        tmf = TrainingModelAndInitializationParams(
+            nnModel=self.model_code,
+            modelType=self.model_type.name,
+            trainingFunc=self.training_function,
+            initialModel=pickle.dumps(pickled_glm),
+            epochs=self.local_epochs,
+            batchSize=self.batch_size,
+            rounds=self.total_rounds,
+            lr=self.lr,
+            folder_string=f"_{self.folder_string}",
+        )
+        print("Training model and function are placed in client ", request.clientId)
         return tmf
 
     def StartTraining(self, request, context):
@@ -816,10 +939,12 @@ class FLServer(FederatedLearningServicer):
             # TODO THIS is a stupid way of changing no of rounds {as they are variables}
             # TODO Try not to forget to change is
 
-            print(f'start training{self.ready_clients} <= {self.MAX_ACCEPTED_CLIENTS_FOR_TRAINING}')
+            print(
+                f"start training{self.ready_clients} <= {self.MAX_ACCEPTED_CLIENTS_FOR_TRAINING}"
+            )
             return FunctionReturns(response=True)
 
-        reason = 'The number of trained clients exceeds the allowed maximum'
+        reason = "The number of trained clients exceeds the allowed maximum"
         return FunctionReturns(response=False, reason=reason)
 
     # TODO: CHECK IF REQUEST IS APPROVED BY CLIENT
@@ -832,7 +957,6 @@ class FLServer(FederatedLearningServicer):
     def check_client_existence(self, tic_time):
         print("check_heart_beat")
         try:
-
             while True:
                 time.sleep(ALARM_CLIENT_DISCONNECTED_TIME + 0.05)
                 current_delete = []
@@ -840,9 +964,13 @@ class FLServer(FederatedLearningServicer):
                     last_seen = self.current_clients[client].last_seen
                     if time.time() - last_seen > ALARM_CLIENT_DISCONNECTED_TIME:
                         print(
-                            f' {time.time()} - {last_seen} [{time.time() - last_seen}]> {ALARM_CLIENT_DISCONNECTED_TIME}')
-                        print(cc.BRed, f'CLIENT {self.current_clients[client].name} NO LONGER CONNECTED',
-                              cc.Color_Off)
+                            f" {time.time()} - {last_seen} [{time.time() - last_seen}]> {ALARM_CLIENT_DISCONNECTED_TIME}"
+                        )
+                        print(
+                            cc.BRed,
+                            f"CLIENT {self.current_clients[client].name} NO LONGER CONNECTED",
+                            cc.Color_Off,
+                        )
                         current_delete.append(client)
                 for i in current_delete:
                     print("will delete ", current_delete)
@@ -852,14 +980,16 @@ class FLServer(FederatedLearningServicer):
             print("There is an error in check_client_existence \n Exception:", ex.args)
 
     def GetNumberOfClients(self, request, context):
-        print(f'No. of clients still in training {len(self.current_clients)}')
+        print(f"No. of clients still in training {len(self.current_clients)}")
         for c in self.current_clients:
-            print(f'\t{c}')
+            print(f"\t{c}")
 
         return Empty()
 
     # will wait for some time and start training
-    def time_is_up(self, ):
+    def time_is_up(
+        self,
+    ):
         # gap = WAITING_TIME_TO_START_TRAINING
         # if self.training_started:
         #     gap = 0.5
@@ -870,12 +1000,12 @@ class FLServer(FederatedLearningServicer):
 def get_time_format(t):
     h = 60 * 60
     m = 1 * 60
-    if (t >= h):
+    if t >= h:
         return time.strftime("%H:%M:%S", time.gmtime(t))
-    if (t > m):
+    if t > m:
         return time.strftime("%M:%S", time.gmtime(t)) + " minutes"
     else:
-        return f'{t:0.2f}' " seconds"
+        return f"{t:0.2f} seconds"
 
 
 # region Commented code
@@ -929,22 +1059,22 @@ def get_time_format(t):
         # send load as torch tensor
         self.send_aggregated_model(self.serialized_global_model)
         return FLInitializationParameters(epochs=self.epochs, rounds=self.total_rounds)
-"""""
+""" ""
 
 
 # endregion
 
 
 def printIt(self, c):
-    cz = b''
+    cz = b""
     for chunk_no in range(self.chunk_count):
-        print(f'in if {chunk_no} ? {self.chunk_count}')
+        print(f"in if {chunk_no} ? {self.chunk_count}")
         zz = self.received_parmQ.get()
         cz += zz
         print(zz)
-        print('-----------------------------------------------------------------------')
+        print("-----------------------------------------------------------------------")
         if chunk_no + 1 == self.chunk_count:
-            print(f'in if last {chunk_no} ? {self.chunk_count}')
+            print(f"in if last {chunk_no} ? {self.chunk_count}")
             chunk_no = 0
             tnsr = pickle.loads(cz)
             print("----", tnsr)
@@ -955,15 +1085,17 @@ def printi(s):
 
 
 def serve(server_, url, port, max_workers):
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=max_workers), options=[
-        ('grpc.max_send_message_length', MAX_MESSAGE_LENGTH),
-        ('grpc.max_receive_message_length', MAX_MESSAGE_LENGTH),
-    ]
-                         )
+    server = grpc.server(
+        futures.ThreadPoolExecutor(max_workers=max_workers),
+        options=[
+            ("grpc.max_send_message_length", MAX_MESSAGE_LENGTH),
+            ("grpc.max_receive_message_length", MAX_MESSAGE_LENGTH),
+        ],
+    )
     add_FederatedLearningServicer_to_server(server_, server)
 
-    print(f'Listens: {url}:{port}')
-    server.add_insecure_port(f'{url}:{port}')
+    print(f"Listens: {url}:{port}")
+    server.add_insecure_port(f"{url}:{port}")
     server.start()
     server.wait_for_termination()
 
@@ -975,12 +1107,18 @@ def server_aggregate(global_model, client_models, client_lens):
     # n = num_selected
     global_dict = global_model.state_dict()
     for k in global_dict.keys():  # calculate average weight/bias --> avg_w/b
-        global_dict[k] -= torch.stack([client_models[i].state_dict()[k].float() *
-                                       (n * client_lens[i] / total)
-                                       for i in range(len(client_models))], 0).mean(0)
+        global_dict[k] -= torch.stack(
+            [
+                client_models[i].state_dict()[k].float() * (n * client_lens[i] / total)
+                for i in range(len(client_models))
+            ],
+            0,
+        ).mean(0)
     global_model.load_state_dict(global_dict)
     for model in client_models:
-        model.load_state_dict(global_model.state_dict())  # local model get updated weight/bias
+        model.load_state_dict(
+            global_model.state_dict()
+        )  # local model get updated weight/bias
 
 
 # FedAvgM
@@ -993,27 +1131,34 @@ def server_aggregate_M(global_model, client_models, client_lens):
 
     for i, k in enumerate(global_dict.keys()):
         # calculate average weight/bias --> avg_w/b
-        temp[k] = torch.stack([client_models[i].state_dict()[k].float() * (n * client_lens[i] / total) for i in
-                               range(len(client_models))], 0).mean(0)
+        temp[k] = torch.stack(
+            [
+                client_models[i].state_dict()[k].float() * (n * client_lens[i] / total)
+                for i in range(len(client_models))
+            ],
+            0,
+        ).mean(0)
         temp_v = 0.9 * v[k] + temp[k]  # v = 0.9v + avg_w/b   momentum=0.9
         global_dict[k] = global_dict[k] - temp_v  # w = w - v
     global_model.load_state_dict(global_dict)
 
 
 def peep():
-    if platform.system() == 'Windows':
+    if platform.system() == "Windows":
         import winsound
+
         duration = 500  # milliseconds
         freq = 1000  # Hz
         winsound.Beep(freq, duration)
     else:
         import os
+
         duration = 1  # seconds
         freq = 440  # Hz
         try:
-            os.system('play -nq -t alsa synth {} sine {}'.format(duration, freq))
+            os.system("play -nq -t alsa synth {} sine {}".format(duration, freq))
         except Exception:
-            print('No file for sound can be played')
+            print("No file for sound can be played")
 
 
 def creation_date(path_to_file):
@@ -1022,7 +1167,7 @@ def creation_date(path_to_file):
     last modified if that isn't possible.
     See http://stackoverflow.com/a/39501288/1709587 for explanation.
     """
-    if platform.system() == 'Windows':
+    if platform.system() == "Windows":
         return os.path.getctime(path_to_file)
     else:
         stat = os.stat(path_to_file)
